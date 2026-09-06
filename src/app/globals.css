@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #e6e6e4;
+    background-image: 
+      radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.45) 0%, rgba(230, 230, 228, 0.95) 75%),
+      radial-gradient(rgba(0,0,0,0.03) 1px, transparent 1px);
+    background-size: 100% 100%, 16px 16px;
+    color: #111111;
+    overflow: hidden;
+    touch-action: none;
+  }
+}
+
+/* Hide standard scrollbars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* 3D perspective stage */
+.perspective-stage {
+  perspective: 1400px;
+  perspective-origin: center center;
+}
+
+.card-deck-shadow {
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.28),
+              0 12px 24px -10px rgba(0, 0, 0, 0.15),
+              0 0 1px 1px rgba(0, 0, 0, 0.08);
+}

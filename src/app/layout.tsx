@@ -32,7 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`h-full select-none ${inter.variable} ${jetbrainsMono.variable}`}>
-      <body className="h-screen w-screen relative font-sans select-none overflow-hidden p-6 md:p-9 text-[11px] leading-relaxed tracking-tight antialiased">
+      <body className="h-screen w-screen relative font-sans select-none overflow-hidden p-0 text-[11px] leading-relaxed tracking-tight antialiased">
         {children}
       </body>
     </html>

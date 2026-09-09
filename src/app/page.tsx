@@ -138,7 +138,7 @@ export default function PortfolioPage() {
       />
 
       {/* Main Viewport */}
-      <main className="w-full h-full grid grid-cols-1 md:grid-cols-12 relative z-20 items-center overflow-hidden pointer-events-none">
+      <main className="w-full h-full grid grid-cols-1 md:grid-cols-12 relative z-20 overflow-hidden pointer-events-none">
         <LeftSidebar
           activeProject={activeProject}
           currentIndex={currentIndex}

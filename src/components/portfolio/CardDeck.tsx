@@ -81,45 +81,45 @@ export function CardDeck({
           imgY = 0;
           pointerEvents = "auto";
         } else if (diff === -1) {
-          // Card of Bottom-Left Stack (Equal scale: 0.85)
-          targetX = -290 * xFactor;
-          targetY = 290 * yFactor;
+          // Card of Bottom-Left Stack (1.2x scale)
+          targetX = -370 * xFactor;
+          targetY = 480 * yFactor;
           targetRot = 6;
           targetRotX = -16;
           targetRotY = -24;
-          targetScale = 0.85;
+          targetScale = 1.02;
           targetOpacity = 0.96;
           targetZ = 32;
           imgY = 0;
           pointerEvents = "auto";
         } else if (diff === -2) {
-          // Card of Bottom-Left Stack (Equal scale: 0.85)
-          targetX = -322 * xFactor;
-          targetY = 322 * yFactor;
+          // Card of Bottom-Left Stack (1.2x scale)
+          targetX = -405 * xFactor;
+          targetY = 530 * yFactor;
           targetRot = 8;
           targetRotX = -18;
           targetRotY = -28;
-          targetScale = 0.85;
+          targetScale = 1.02;
           targetOpacity = 0.88;
           targetZ = 34;
           imgY = 0;
           pointerEvents = "auto";
         } else if (diff === -3) {
-          // Card of Bottom-Left Stack (Equal scale: 0.85)
-          targetX = -354 * xFactor;
-          targetY = 354 * yFactor;
+          // Card of Bottom-Left Stack (1.2x scale)
+          targetX = -440 * xFactor;
+          targetY = 580 * yFactor;
           targetRot = 10;
           targetRotX = -20;
           targetRotY = -32;
-          targetScale = 0.85;
+          targetScale = 1.02;
           targetOpacity = 0.78;
           targetZ = 36;
           imgY = 0;
           pointerEvents = "auto";
         } else if (diff < -3) {
           // Outer Card of Bottom-Left Stack (Equal scale: 0.85)
-          targetX = (-386 - Math.abs(diff + 3) * 32) * xFactor;
-          targetY = (386 + Math.abs(diff + 3) * 32) * yFactor;
+          targetX = (-475 - Math.abs(diff + 3) * 35) * xFactor;
+          targetY = (630 + Math.abs(diff + 3) * 35) * yFactor;
           targetRot = 12;
           targetRotX = -22;
           targetRotY = -36;
@@ -129,37 +129,37 @@ export function CardDeck({
           imgY = 0;
           pointerEvents = "none";
         } else if (diff === 1) {
-          // Front-most Card of Top-Right Stack (Perspective angle matching reference image)
+          // Front-most Card of Top-Right Stack (1.2x scale)
           targetX = 280 * xFactor;
-          targetY = -300 * yFactor;
-          targetRot = -4;
-          targetRotX = 8;
-          targetRotY = 28;
-          targetScale = 0.85;
+          targetY = -420 * yFactor;
+          targetRot = 6;
+          targetRotX = 16;
+          targetRotY = 24;
+          targetScale = 1.02;
           targetOpacity = 0.96;
           targetZ = 38;
           imgY = 0;
           pointerEvents = "auto";
         } else if (diff === 2) {
-          // Second Card of Top-Right Stack (Perspective angle matching reference image)
+          // Second Card of Top-Right Stack (1.2x scale)
           targetX = 325 * xFactor;
-          targetY = -335 * yFactor;
-          targetRot = -5;
-          targetRotX = 10;
-          targetRotY = 32;
-          targetScale = 0.78;
+          targetY = -460 * yFactor;
+          targetRot = 8;
+          targetRotX = 18;
+          targetRotY = 28;
+          targetScale = 0.936;
           targetOpacity = 0.88;
           targetZ = 36;
           imgY = 0;
           pointerEvents = "auto";
         } else if (diff === 3) {
-          // Third Card of Top-Right Stack (Perspective angle matching reference image)
+          // Third Card of Top-Right Stack (1.2x scale)
           targetX = 370 * xFactor;
-          targetY = -370 * yFactor;
-          targetRot = -6;
-          targetRotX = 12;
-          targetRotY = 36;
-          targetScale = 0.71;
+          targetY = -500 * yFactor;
+          targetRot = 10;
+          targetRotX = 20;
+          targetRotY = 32;
+          targetScale = 0.852;
           targetOpacity = 0.78;
           targetZ = 34;
           imgY = 0;
@@ -167,7 +167,7 @@ export function CardDeck({
         } else if (diff === 4) {
           // Fourth Card of Top-Right Stack (Perspective angle matching reference image)
           targetX = 415 * xFactor;
-          targetY = -405 * yFactor;
+          targetY = -630 * yFactor;
           targetRot = -7;
           targetRotX = 14;
           targetRotY = 40;
@@ -178,7 +178,7 @@ export function CardDeck({
           pointerEvents = "auto";
         } else {
           targetX = (460 + (diff - 4) * 45) * xFactor;
-          targetY = (-440 - (diff - 4) * 35) * yFactor;
+          targetY = (-680 - (diff - 4) * 40) * yFactor;
           targetRot = -8;
           targetRotX = 16;
           targetRotY = 44;
@@ -189,7 +189,10 @@ export function CardDeck({
           pointerEvents = "none";
         }
 
-        if (immediate) {
+        // Cards wrapping around the invisible arc (abs diff > 3) - instant, invisible
+        const isWrapping = Math.abs(diff) > 3;
+
+        if (immediate || isWrapping) {
           gsap.set(card, {
             x: targetX,
             y: targetY,
@@ -197,9 +200,9 @@ export function CardDeck({
             rotateX: targetRotX,
             rotateY: targetRotY,
             scale: targetScale,
-            opacity: targetOpacity,
+            opacity: 0,
             zIndex: targetZ,
-            pointerEvents: pointerEvents,
+            pointerEvents: "none",
           });
           gsap.set(imgContainer, { yPercent: imgY });
         } else {

@@ -14,11 +14,9 @@ import { ProjectModal } from '@/components/portfolio/ProjectModal';
 import { SectionModal } from '@/components/portfolio/SectionModal';
 
 const totalCount = PROJECTS.length;
-const CENTER_SET = 2;
 
 export default function PortfolioPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [virtualIndex, setVirtualIndex] = useState(CENTER_SET * totalCount);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [activeSection, setActiveSection] = useState<NavSection>('work');
@@ -43,27 +41,17 @@ export default function PortfolioPage() {
   const goToIndex = useCallback(
     (newIndex: number, direction?: 'up' | 'down', stepDelta?: number) => {
       const now = Date.now();
-      // Allow fluid transitions with a smooth 150ms cooldown for high-precision trackpads
       if (now - lastTriggerTimeRef.current < 150) return;
 
-      let step =
-        typeof stepDelta === 'number'
-          ? stepDelta
-          : newIndex - currentIndex;
-      while (step > totalCount / 2) step -= totalCount;
-      while (step < -totalCount / 2) step += totalCount;
-
-      setVirtualIndex((prev) => prev + step);
-
       const wrappedIndex = ((newIndex % totalCount) + totalCount) % totalCount;
-      const dir = direction || (step > 0 ? 'down' : 'up');
+      const dir = direction || (newIndex > currentIndex ? 'down' : 'up');
 
       lastTriggerTimeRef.current = now;
       setCurrentIndex(wrappedIndex);
 
       playDeckSound(dir);
     },
-    [currentIndex, playDeckSound]
+    [currentIndex, playDeckSound, totalCount]
   );
 
   // Liquid human-action native wheel scroll handler
@@ -161,9 +149,8 @@ export default function PortfolioPage() {
 
         <RightSidebar
           projects={PROJECTS}
-          virtualIndex={virtualIndex}
+          currentIndex={currentIndex}
           onGoToIndex={goToIndex}
-          onUpdateVirtualIndex={setVirtualIndex}
         />
       </main>
 

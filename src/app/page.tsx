@@ -125,18 +125,21 @@ export default function PortfolioPage() {
         }}
       />
 
-      {/* Main Viewport */}
-      <main className="w-full h-full grid grid-cols-1 md:grid-cols-12 relative z-20 overflow-hidden pointer-events-none">
-        <LeftSidebar
-          activeProject={activeProject}
-          currentIndex={currentIndex}
-          totalCount={totalCount}
-          activeSection={activeSection}
-          onSelectSection={(section) => {
-            setActiveSection(section);
-          }}
-        />
-
+      {/* Main Viewport — carries the page background so the counter's mix-blend-difference
+          has a real backdrop to invert against (main is a z-20 stacking context, so a
+          transparent main would blend against nothing and render the number solid white). */}
+      <main
+        className="w-full h-full grid grid-cols-1 md:grid-cols-12 relative z-20 overflow-hidden pointer-events-none"
+        style={{
+          backgroundColor: '#e6e6e4',
+          backgroundImage:
+            'radial-gradient(circle at 50% 50%, rgba(255,255,255,0.45) 0%, rgba(230,230,228,0.95) 75%), radial-gradient(rgba(0,0,0,0.03) 1px, transparent 1px)',
+          backgroundSize: '100% 100%, 16px 16px',
+        }}
+      >
+        {/* Card deck first in DOM so the left sidebar (which holds the mix-blend counter)
+            paints AFTER it — the counter sits on top of the cards and shares main's blend
+            group. Explicit grid columns keep the visual left/center/right order. */}
         <CardDeck
           projects={PROJECTS}
           currentIndex={currentIndex}
@@ -144,6 +147,16 @@ export default function PortfolioPage() {
           onSelectProject={(project) => {
             setSelectedProject(project);
             showToast(`Viewing: ${project.title}`);
+          }}
+        />
+
+        <LeftSidebar
+          activeProject={activeProject}
+          currentIndex={currentIndex}
+          totalCount={totalCount}
+          activeSection={activeSection}
+          onSelectSection={(section) => {
+            setActiveSection(section);
           }}
         />
 

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import Image from "next/image";
 import gsap from "gsap";
 import { Project } from "@/types/portfolio";
-import { ChevronDown, ExternalLink } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 interface CardDeckProps {
   projects: Project[];
@@ -293,7 +293,7 @@ export function CardDeck({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      className="col-span-1 md:col-span-6 h-full relative perspective-stage flex items-center justify-center pointer-events-auto cursor-grab active:cursor-grabbing overflow-visible touch-none select-none"
+      className="col-span-1 md:col-start-4 md:col-span-6 md:row-start-1 h-full relative perspective-stage flex items-center justify-center pointer-events-auto cursor-grab active:cursor-grabbing overflow-visible touch-none select-none"
     >
       {/* Scaled card dimension stage */}
       <div className="relative w-[75vw] sm:w-[315px] md:w-[335px] lg:w-[370px] aspect-[4/3] flex items-center justify-center">
@@ -340,35 +340,6 @@ export function CardDeck({
                   </div>
 
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20 pointer-events-none" />
-
-                  {/* Card Corner Details */}
-                  <div className="absolute top-3.5 left-4 text-white/90 font-mono text-[9.5px] tracking-widest flex items-center space-x-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                    <span>{project.category}</span>
-                  </div>
-
-                  {/* Hover indicator for active card */}
-                  {isCenter && (
-                    <div className="absolute top-3.5 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 backdrop-blur-md px-2 py-0.5 rounded text-[8px] font-mono text-white/90 flex items-center space-x-1">
-                      <span>EXPLORE</span>
-                      <ExternalLink className="w-2.5 h-2.5" />
-                    </div>
-                  )}
-
-                  <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end text-white">
-                    <div>
-                      <p className="font-mono text-[8.5px] tracking-widest uppercase opacity-75">
-                        {project.launch}
-                      </p>
-                      <h3 className="text-lg md:text-xl font-bold tracking-tight uppercase">
-                        {project.title}
-                      </h3>
-                    </div>
-                    <div className="font-mono text-xs font-bold opacity-80">
-                      {project.id}
-                      <span className="text-[10px] opacity-50">/08</span>
-                    </div>
-                  </div>
                 </div>
               </div>
             );

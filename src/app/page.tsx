@@ -137,9 +137,17 @@ export default function PortfolioPage() {
           backgroundSize: '100% 100%, 16px 16px',
         }}
       >
-        {/* Card deck first in DOM so the left sidebar (which holds the mix-blend counter)
-            paints AFTER it — the counter sits on top of the cards and shares main's blend
-            group. Explicit grid columns keep the visual left/center/right order. */}
+        {/* Paint order (all pinned to row 1 via explicit grid columns, so DOM order only
+            controls stacking, not layout):
+            1. RightSidebar  — bottom, so the top-stack cards paint over it
+            2. CardDeck      — above the right sidebar
+            3. LeftSidebar   — last, so the mix-blend counter stays on top of the cards */}
+        <RightSidebar
+          projects={PROJECTS}
+          currentIndex={currentIndex}
+          onGoToIndex={goToIndex}
+        />
+
         <CardDeck
           projects={PROJECTS}
           currentIndex={currentIndex}
@@ -158,12 +166,6 @@ export default function PortfolioPage() {
           onSelectSection={(section) => {
             setActiveSection(section);
           }}
-        />
-
-        <RightSidebar
-          projects={PROJECTS}
-          currentIndex={currentIndex}
-          onGoToIndex={goToIndex}
         />
       </main>
 

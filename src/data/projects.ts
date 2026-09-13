@@ -3,6 +3,7 @@ import { Project } from '@/types/portfolio';
 export const PROJECTS: Project[] = [
   {
     id: "01",
+    themeColors: ["#1b2a6b", "#f2ede0", "#2f6bff"],
     title: "FROMANOTHER",
     subtitle: "Agency & Studio",
     category: "Agency & Studio",
@@ -27,6 +28,7 @@ export const PROJECTS: Project[] = [
   },
   {
     id: "02",
+    themeColors: ["#e63946", "#f1faee", "#457b9d"],
     title: "IVENTIONS",
     subtitle: "Promotional",
     category: "Promotional",
@@ -52,6 +54,7 @@ export const PROJECTS: Project[] = [
   },
   {
     id: "03",
+    themeColors: ["#606c38", "#fefae0", "#dda15e"],
     title: "DAFI TROPICDANE",
     subtitle: "Furniture",
     category: "Furniture & Interior",
@@ -75,6 +78,7 @@ export const PROJECTS: Project[] = [
   },
   {
     id: "04",
+    themeColors: ["#22223b", "#c9ada7", "#f2e9e4"],
     title: "DISTRICT2 STUDIO",
     subtitle: "Agency & Studio Showcase",
     category: "Agency & Studio",
@@ -98,6 +102,7 @@ export const PROJECTS: Project[] = [
   },
   {
     id: "05",
+    themeColors: ["#e76f51", "#f4a261", "#e9c46a"],
     title: "EST POPULO",
     subtitle: "Agency & Studio",
     category: "Brand Experience",
@@ -117,6 +122,7 @@ export const PROJECTS: Project[] = [
   },
   {
     id: "06",
+    themeColors: ["#264653", "#2a9d8f", "#e9c46a"],
     title: "BISON STUDIO",
     subtitle: "3D & Visualization",
     category: "Architectural Studio",
@@ -136,6 +142,7 @@ export const PROJECTS: Project[] = [
   },
   {
     id: "07",
+    themeColors: ["#ef4444", "#f5e9c9", "#f59e0b"],
     title: "WON J. YOU STUDIOS",
     subtitle: "Personal Brand",
     category: "Design Leadership",
@@ -155,6 +162,7 @@ export const PROJECTS: Project[] = [
   },
   {
     id: "08",
+    themeColors: ["#6d28d9", "#a78bfa", "#22d3ee"],
     title: "MUX STUDIO",
     subtitle: "Research & UX",
     category: "Digital Agency",

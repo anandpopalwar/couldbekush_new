@@ -96,22 +96,13 @@ export function RightSidebar({
     return () => window.removeEventListener("resize", handleResize);
   }, [restY]);
 
-  // Swallow wheel/scroll gestures over the sidebar so scrolling here neither
-  // navigates the sidebar nor bubbles up to the global page scroll handler.
-  const handleWheel = useCallback((e: WheelEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
+  // No local wheel handler: wheel events over the sidebar bubble up to the global
+  // page scroll handler, which advances the deck (and the sidebar follows in sync).
 
-  useEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    viewport.addEventListener("wheel", handleWheel, { passive: false });
-    return () => viewport.removeEventListener("wheel", handleWheel);
-  }, [handleWheel]);
+  const themeColors = projects[currentIndex]?.themeColors;
 
   return (
-    <aside className="hidden md:flex md:col-start-10 md:col-span-3 md:row-start-1 h-full flex-col justify-between pointer-events-auto pl-6 pr-20 overflow-hidden relative z-30">
+    <aside className="hidden md:flex md:col-start-10 md:col-span-3 md:row-start-1 h-full flex-col justify-between pointer-events-auto pl-0 pr-30 overflow-hidden relative">
       <div
         ref={viewportRef}
         className="w-full h-full relative overflow-hidden touch-none"
@@ -140,13 +131,13 @@ export function RightSidebar({
                   onGoToIndex(pIdx, s < 0 ? "down" : "up");
                 }}
                 style={{ opacity: fade }}
-                className="h-[150px] relative flex flex-col items-center justify-center text-center cursor-pointer select-none px-2"
+                className="h-[150px] relative flex flex-col items-center justify-center text-center cursor-pointer select-none px-0 pr-28 "
               >
                 <span
                   className={`uppercase mb-1 ${
                     isCenter
-                      ? "text-ink font-extrabold text-[10.5px] tracking-widest"
-                      : "text-ink font-normal text-[9px] tracking-normal"
+                      ? "text-ink font-normal text-[10.5px] tracking-widest"
+                      : "text-gray-400 font-normal text-[9px] tracking-normal"
                   }`}
                 >
                   {project.subtitle}
@@ -155,8 +146,8 @@ export function RightSidebar({
                 <h4
                   className={`uppercase ${
                     isCenter
-                      ? "text-ink font-black text-[19px] md:text-[21px] tracking-tight"
-                      : "text-ink font-medium text-[14px] tracking-normal"
+                      ? "text-ink font-normal text-[19px] md:text-[21px] tracking-tight"
+                      : "text-gray-400 font-normal text-[14px] tracking-normal"
                   }`}
                 >
                   {project.title}
@@ -165,8 +156,8 @@ export function RightSidebar({
                 <span
                   className={`${
                     isCenter
-                      ? "text-ink font-black text-sm my-1"
-                      : "text-ink font-normal text-[10px] my-0.5"
+                      ? "text-ink font-normal text-sm my-1"
+                      : "text-gray-400 font-normal text-[10px] my-0.5"
                   }`}
                 >
                   —
@@ -175,25 +166,31 @@ export function RightSidebar({
                 <p
                   className={`max-w-[280px] line-clamp-3 ${
                     isCenter
-                      ? "text-ink font-black text-[12px] leading-snug"
-                      : "text-ink font-normal text-[10px]"
+                      ? "text-ink font-normal text-[12px] leading-snug"
+                      : "text-gray-400 font-normal text-[10px]"
                   }`}
                 >
                   {project.description}
                 </p>
-
-                {isCenter && (
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2 hidden xl:flex space-x-1.5 pointer-events-none">
-                    <span className="w-3.5 h-3.5 bg-pink-200 rounded-xs inline-block shadow-xs" />
-                    <span className="w-3.5 h-3.5 bg-indigo-200 rounded-xs inline-block shadow-xs" />
-                    <span className="w-3.5 h-3.5 bg-amber-100 rounded-xs inline-block shadow-xs" />
-                  </div>
-                )}
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* Selected project's theme swatches — fixed at the right edge, vertically centered
+          (represents the theme of the currently selected project). */}
+      {themeColors && themeColors.length > 0 && (
+        <div className="absolute right-6 top-1/2 -translate-y-1/2 hidden xl:flex space-x-1.5 pointer-events-none">
+          {themeColors.map((color, i) => (
+            <span
+              key={i}
+              className="w-3.5 h-3.5 rounded-[3px] inline-block shadow-xs"
+              style={{ backgroundColor: color }}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="absolute bottom-6 right-6 z-30 font-mono text-[10px] font-bold text-ink uppercase tracking-wider flex items-center space-x-1 hover:opacity-75 transition-opacity cursor-pointer">
         <span className="underline font-black">'25 showreel</span>

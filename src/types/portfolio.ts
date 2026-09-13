@@ -13,6 +13,7 @@ export interface Project {
   liveUrl?: string;
   overview?: string;
   gallery?: string[];
+  themeColors?: string[];
 }
 
 export type NavSection = 'work' | 'about' | 'playground' | 'contact';

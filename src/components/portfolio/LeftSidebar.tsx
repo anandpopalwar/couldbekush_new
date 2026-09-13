@@ -33,9 +33,10 @@ export function LeftSidebar({
 
     const applyBlur = () => {
       const px = `blur(${blurRef.current.v}px)`;
-      // Only blur the metadata. The counter number is NOT blurred: a `filter` on it would
-      // create a stacking context and break its mix-blend-difference against the cards/bg.
       if (metaContainerRef.current) metaContainerRef.current.style.filter = px;
+      // Blur the counter number too while transitioning. The filter is cleared at rest
+      // (onComplete) so its mix-blend-difference stays clean once settled.
+      if (counterRef.current) counterRef.current.style.filter = px;
     };
 
     // Ramp the blur up quickly as the card starts moving.
@@ -58,6 +59,7 @@ export function LeftSidebar({
         onUpdate: applyBlur,
         onComplete: () => {
           if (metaContainerRef.current) metaContainerRef.current.style.filter = '';
+          if (counterRef.current) counterRef.current.style.filter = '';
         },
       });
     }, 170);
@@ -84,17 +86,17 @@ export function LeftSidebar({
         <span className="block text-[10px] font-mono tracking-widest text-inkMuted uppercase mb-8">
           Menu
         </span>
-        <nav className="space-y-0 uppercase font-extrabold tracking-tight text-[20px] md:text-[24px] leading-[1.1]">
+        <nav className="group space-y-0 uppercase font-extrabold tracking-tight text-[20px] md:text-[24px] leading-[1.1]">
           {navItems.map((item) => {
             const isActive = activeSection === item.id;
             return (
               <div key={item.id}>
                 <button
                   onClick={() => onSelectSection(item.id)}
-                  className={`inline-flex items-center transition-colors ${
+                  className={`inline-flex items-center transition-all duration-200 group-hover:blur-[3px] hover:!blur-none ${
                     isActive
-                      ? 'text-ink font-black'
-                      : 'text-inkMuted hover:text-ink font-bold'
+                      ? 'text-ink font-bold'
+                      : 'font-bold hover:text-ink'
                   }`}
                 >
                   {isActive && <span className="mr-1.5 text-ink">→</span>}
@@ -110,34 +112,34 @@ export function LeftSidebar({
           labels never shift with content length; Recognition simply grows downward. */}
       <div
         ref={metaContainerRef}
-        className="absolute top-[43%] left-0 right-6 grid grid-cols-2 gap-x-6 items-start"
+        className="absolute top-[43%] left-5 right-6 grid grid-cols-2 gap-x-6 items-start"
       >
         {/* Left column: Role */}
-        <div className="grid grid-cols-3 gap-2 items-start content-start">
-          <span className="text-[10px] tracking-wide text-inkMuted">
+        <div className="grid grid-cols-[5rem_1fr] gap-6 items-start content-start">
+          <span className="text-[12px] tracking-wide text-inkMuted">
             Role
           </span>
-          <p className="col-span-2 text-[12px] md:text-[13px] font-bold text-ink leading-snug">
+          <p className="text-[12px] font-bold text-ink leading-snug">
             {activeProject.role}
           </p>
         </div>
 
         {/* Right column: Launch, then Recognition */}
         <div className="space-y-8">
-          <div className="grid grid-cols-3 gap-2 items-start">
-            <span className="text-[10px] tracking-wide text-inkMuted">
+          <div className="grid grid-cols-[5rem_1fr] gap-6 items-start">
+            <span className="text-[12px] tracking-wide text-inkMuted">
               Launch
             </span>
-            <p className="col-span-2 text-[12px] md:text-[13px] font-bold text-ink">
+            <p className="text-[12px] font-bold text-ink">
               {activeProject.launch}
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 items-start">
-            <span className="text-[10px] tracking-wide text-inkMuted">
+          <div className="grid grid-cols-[5rem_1fr] gap-6 items-start">
+            <span className="text-[12px] tracking-wide text-inkMuted">
               Recognition
             </span>
-            <ul className="col-span-2 space-y-1 text-ink text-[11px] font-semibold leading-tight">
+            <ul className="text-ink text-[12px] font-bold leading-snug whitespace-nowrap">
               {activeProject.recognition.map((rec, idx) => (
                 <li key={idx}>{rec}</li>
               ))}
@@ -155,7 +157,7 @@ export function LeftSidebar({
           </span>
           <span
             ref={counterRef}
-            className="text-[8rem] md:text-[10rem] lg:text-[12rem] font-medium tracking-tight text-white mix-blend-difference inline-block leading-none"
+            className="text-[8rem] md:text-[10rem] lg:text-[12rem] font-medium tracking-tight text-white mix-blend-difference inline-block leading-none tabular-nums"
           >
             {activeProject.id}
           </span>
@@ -165,8 +167,8 @@ export function LeftSidebar({
         </div>
       </div>
 
-      {/* Scroll hint — far-left gutter, very bottom */}
-      <div className="absolute bottom-6 left-0 text-[10px] tracking-wide text-inkMuted">
+      {/* Scroll hint — bottom, inset from the left edge to match the right-side padding */}
+      <div className="absolute bottom-6 left-5 text-[10px] tracking-wide text-inkMuted">
         Scroll
       </div>
     </aside>

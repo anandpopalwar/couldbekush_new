@@ -26,6 +26,7 @@ export function CardDeck({
   const stageRef = useRef<HTMLDivElement>(null);
   const cardsRef = useRef<(HTMLDivElement | null)[]>([]);
   const imgsRef = useRef<(HTMLDivElement | null)[]>([]);
+  const prevDiffRef = useRef<number[]>([]);
 
   const [hintVisible, setHintVisible] = useState(true);
   const isDraggingRef = useRef(false);
@@ -57,6 +58,14 @@ export function CardDeck({
         while (diff > totalCount / 2) diff -= totalCount;
         while (diff < -totalCount / 2) diff += totalCount;
 
+        // A card "recycled" across the loop boundary when its slot jumps by more than half
+        // the deck in a single update. Those must teleport (instant) to their new stack slot
+        // instead of animating diagonally across the empty background.
+        const prevDiff = prevDiffRef.current[idx];
+        const recycled =
+          prevDiff !== undefined && Math.abs(diff - prevDiff) > totalCount / 2;
+        prevDiffRef.current[idx] = diff;
+
         let targetX = 0;
         let targetY = 0;
         let targetRot = 0;
@@ -65,6 +74,7 @@ export function CardDeck({
         let targetScale = 1;
         let targetOpacity = 1;
         let targetZ = 10;
+        let targetTranslateZ = 0;
         let imgY = 0;
         let pointerEvents = "auto";
 
@@ -72,7 +82,7 @@ export function CardDeck({
           // Center Selected Featured Card (Top-most focus)
           targetX = 0;
           targetY = 0;
-          targetRot = 0;
+          targetRot = 3;
           targetRotX = 0;
           targetRotY = 0;
           targetScale = 1;
@@ -84,9 +94,9 @@ export function CardDeck({
           // Card of Bottom-Left Stack (1.2x scale)
           targetX = -370 * xFactor;
           targetY = 480 * yFactor;
-          targetRot = 6;
-          targetRotX = -16;
-          targetRotY = -24;
+          targetRot = 9;
+          targetRotX = -30;
+          targetRotY = -32;
           targetScale = 1.02;
           targetOpacity = 0.96;
           targetZ = 32;
@@ -96,9 +106,9 @@ export function CardDeck({
           // Card of Bottom-Left Stack (1.2x scale)
           targetX = -405 * xFactor;
           targetY = 530 * yFactor;
-          targetRot = 8;
-          targetRotX = -18;
-          targetRotY = -28;
+          targetRot = 9;
+          targetRotX = -30;
+          targetRotY = -32;
           targetScale = 1.02;
           targetOpacity = 0.88;
           targetZ = 34;
@@ -108,8 +118,8 @@ export function CardDeck({
           // Card of Bottom-Left Stack (1.2x scale)
           targetX = -440 * xFactor;
           targetY = 580 * yFactor;
-          targetRot = 10;
-          targetRotX = -20;
+          targetRot = 9;
+          targetRotX = -30;
           targetRotY = -32;
           targetScale = 1.02;
           targetOpacity = 0.78;
@@ -120,21 +130,23 @@ export function CardDeck({
           // Outer Card of Bottom-Left Stack (Equal scale: 0.85)
           targetX = (-475 - Math.abs(diff + 3) * 35) * xFactor;
           targetY = (630 + Math.abs(diff + 3) * 35) * yFactor;
-          targetRot = 12;
-          targetRotX = -22;
-          targetRotY = -36;
+          targetRot = 9;
+          targetRotX = -30;
+          targetRotY = -32;
           targetScale = 0.85;
           targetOpacity = 0;
           targetZ = 38;
           imgY = 0;
           pointerEvents = "none";
         } else if (diff === 1) {
-          // Front-most Card of Top-Right Stack (1.2x scale)
+          // Front-most Card of Top-Right Stack — custom 3D surface transform
+          // (translateZ(57) rotateX(-25) rotateY(-32) rotateZ(-9))
           targetX = 280 * xFactor;
           targetY = -420 * yFactor;
-          targetRot = 6;
-          targetRotX = 16;
-          targetRotY = 24;
+          targetRot = 9;
+          targetRotX = -30;
+          targetRotY = -32;
+          targetTranslateZ = 57;
           targetScale = 1.02;
           targetOpacity = 0.96;
           targetZ = 38;
@@ -144,9 +156,9 @@ export function CardDeck({
           // Second Card of Top-Right Stack (1.2x scale)
           targetX = 325 * xFactor;
           targetY = -460 * yFactor;
-          targetRot = 8;
-          targetRotX = 18;
-          targetRotY = 28;
+          targetRot = 9;
+          targetRotX = -30;
+          targetRotY = -32;
           targetScale = 0.936;
           targetOpacity = 0.88;
           targetZ = 36;
@@ -156,9 +168,9 @@ export function CardDeck({
           // Third Card of Top-Right Stack (1.2x scale)
           targetX = 370 * xFactor;
           targetY = -500 * yFactor;
-          targetRot = 10;
-          targetRotX = 20;
-          targetRotY = 32;
+          targetRot = 9;
+          targetRotX = -30;
+          targetRotY = -32;
           targetScale = 0.852;
           targetOpacity = 0.78;
           targetZ = 34;
@@ -192,23 +204,27 @@ export function CardDeck({
         // Cards wrapping around the invisible arc (abs diff > 3) - instant, invisible
         const isWrapping = Math.abs(diff) > 3;
 
-        if (immediate || isWrapping) {
+        if (immediate || isWrapping || recycled) {
           gsap.set(card, {
             x: targetX,
             y: targetY,
+            z: targetTranslateZ,
             rotation: targetRot,
             rotateX: targetRotX,
             rotateY: targetRotY,
             scale: targetScale,
-            opacity: 0,
+            // Parked (wrapping) cards stay invisible; a recycled card pops straight into its
+            // new stack slot at the correct opacity instead of fading across the background.
+            opacity: isWrapping ? 0 : targetOpacity,
             zIndex: targetZ,
-            pointerEvents: "none",
+            pointerEvents: isWrapping ? "none" : pointerEvents,
           });
           gsap.set(imgContainer, { yPercent: imgY });
         } else {
           gsap.to(card, {
             x: targetX,
             y: targetY,
+            z: targetTranslateZ,
             rotation: targetRot,
             rotateX: targetRotX,
             rotateY: targetRotY,
@@ -301,6 +317,10 @@ export function CardDeck({
         <div className="relative w-full h-full">
           {projects.map((project, idx) => {
             const isCenter = idx === currentIndex;
+            let diff = idx - currentIndex;
+            while (diff > totalCount / 2) diff -= totalCount;
+            while (diff < -totalCount / 2) diff += totalCount;
+            const isTopFirst = diff === 1; // first card of the top stack
             return (
               <div
                 key={project.id}
@@ -311,13 +331,12 @@ export function CardDeck({
                   if (isCenter) {
                     onSelectProject(project);
                   } else {
-                    let diff = idx - currentIndex;
-                    while (diff > totalCount / 2) diff -= totalCount;
-                    while (diff < -totalCount / 2) diff += totalCount;
                     onGoToIndex(idx, diff > 0 ? "down" : "up", diff);
                   }
                 }}
-                className="absolute inset-0 w-full h-full rounded-sm card-deck-shadow overflow-hidden bg-[#151515] transition-shadow duration-500 will-change-transform select-none cursor-pointer group"
+                className={`absolute inset-0 w-full h-full rounded-sm ${
+                  isTopFirst ? "card-flap-shadow" : "card-deck-shadow"
+                } overflow-hidden bg-[#151515] transition-shadow duration-500 will-change-transform select-none cursor-pointer group`}
                 data-index={idx}
               >
                 <div className="relative w-full h-full overflow-hidden">

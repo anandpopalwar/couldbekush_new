@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-09-13 — Inverted counter, 3D top card, theme swatches, deck polish
+
+### Selected-work counter — inverts against its backdrop
+- The big counter number now uses `text-white` + `mix-blend-difference`, so it renders dark over the light page and light over the dark cards.
+- Made it work by giving `main` the page background (`page.tsx`) and fixing stacking: `page.tsx` renders **RightSidebar → CardDeck → LeftSidebar** (all pinned with `col-start-*` + `row-start-1`) so the counter stays in `main`'s blend group and on top of the cards without any isolating `z-index`. See memory `counter-mix-blend-stacking`.
+- `/NN` total no longer shifts as the number changes — the number uses `tabular-nums`.
+
+### CardDeck (`src/components/portfolio/CardDeck.tsx`)
+- First top-stack card now uses a custom 3D surface transform (`translateZ(57) rotateX(-30) rotateY(-32) rotateZ(-9)`) with a deeper `.card-flap-shadow`; stage perspective raised to `2500px`.
+- **Fixed the background "card flow" during recycling**: a card that crosses the loop boundary now teleports (`gsap.set`) straight into its new stack slot instead of gliding across the empty background (`prevDiffRef` + recycle detection). Foreground flow (bottom → center → top) is unchanged.
+
+### RightSidebar (`src/components/portfolio/RightSidebar.tsx`)
+- Theme swatches moved out of the scrolling list and **pinned to the right edge** (vertically centered); they now show the **selected project's** `themeColors` and change per project.
+- Increased right padding / swatch offset for more breathing room on the right.
+- Scrolling over the sidebar now **drives the main deck** (removed the local wheel handler so the event reaches the global page scroll handler); the sidebar follows in sync. Cards also paint above the sidebar.
+
+### LeftSidebar (`src/components/portfolio/LeftSidebar.tsx`)
+- Counter number is also blurred during transitions (cleared at rest so its mix-blend stays clean).
+- Metadata uses fixed-width label columns (`grid-cols-[5rem_1fr]`) with more label→value spacing; recognition entries are uniform size/weight and no longer wrap.
+- Left-edge content inset to match the right-side padding.
+- Menu hover: hovering an item keeps it sharp while the **other items blur** (`group-hover:blur` + `hover:!blur-none`).
+
+### Data / types
+- Added `themeColors?: string[]` to `Project` and a distinct 3-color palette to each of the 8 projects.
+
 ## 2026-09-13 — Portfolio UI pass (left sidebar, right sidebar, counter, top bar)
 
 ### RightSidebar (`src/components/portfolio/RightSidebar.tsx`)

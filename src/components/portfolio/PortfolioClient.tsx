@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { PROJECTS } from '@/data/projects';
 import { Project, NavSection } from '@/types/portfolio';
 import { useAudioFeedback } from '@/hooks/useAudioFeedback';
 import { GrainOverlay } from '@/components/ui/GrainOverlay';
@@ -13,9 +12,8 @@ import { RightSidebar } from '@/components/portfolio/RightSidebar';
 import { ProjectModal } from '@/components/portfolio/ProjectModal';
 import { SectionModal } from '@/components/portfolio/SectionModal';
 
-const totalCount = PROJECTS.length;
-
-export default function PortfolioPage() {
+export function PortfolioClient({ projects }: { projects: Project[] }) {
+  const totalCount = projects.length;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -108,7 +106,7 @@ export default function PortfolioPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentIndex, goToIndex, selectedProject, activeSection]);
 
-  const activeProject = PROJECTS[currentIndex];
+  const activeProject = projects[currentIndex];
 
   return (
     <div className="w-full h-full relative overflow-hidden select-none">
@@ -143,13 +141,13 @@ export default function PortfolioPage() {
             2. CardDeck      — above the right sidebar
             3. LeftSidebar   — last, so the mix-blend counter stays on top of the cards */}
         <RightSidebar
-          projects={PROJECTS}
+          projects={projects}
           currentIndex={currentIndex}
           onGoToIndex={goToIndex}
         />
 
         <CardDeck
-          projects={PROJECTS}
+          projects={projects}
           currentIndex={currentIndex}
           onGoToIndex={goToIndex}
           onSelectProject={(project) => {

@@ -1,16 +1,22 @@
 import type { NextConfig } from "next";
-import path from "path";
+import { withPayload } from "@payloadcms/next/withPayload";
 
 const nextConfig: NextConfig = {
-  outputFileTracingRoot: path.join(__dirname, "./"),
+  // process.cwd() is ESM-safe (no __dirname now that the project is "type": "module").
+  outputFileTracingRoot: process.cwd(),
   images: {
     remotePatterns: [
       {
         protocol: "https",
         hostname: "images.unsplash.com",
       },
+      // Vercel Blob public store: <store-id>.public.blob.vercel-storage.com
+      {
+        protocol: "https",
+        hostname: "*.public.blob.vercel-storage.com",
+      },
     ],
   },
 };
 
-export default nextConfig;
+export default withPayload(nextConfig);

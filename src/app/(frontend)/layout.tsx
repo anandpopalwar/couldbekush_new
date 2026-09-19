@@ -6,6 +6,9 @@ const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
   display: 'swap',
+  // Inter is variable on the optical-size axis; opsz 32 is "Inter Display",
+  // which the title scale uses. One download covers both text and display.
+  axes: ['opsz'],
 });
 
 const jetbrainsMono = JetBrains_Mono({

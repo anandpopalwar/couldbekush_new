@@ -11,6 +11,20 @@ import { CardDeck } from '@/components/portfolio/CardDeck';
 import { RightSidebar } from '@/components/portfolio/RightSidebar';
 import { ProjectModal } from '@/components/portfolio/ProjectModal';
 import { SectionModal } from '@/components/portfolio/SectionModal';
+import { CardDeck2 } from './CardDeck2';
+
+// Wheel feel. The deck steps like a ratchet rather than flowing: a step needs a
+// deliberate amount of wheel travel, and the leftover delta is dropped after each
+// one, so a single flick advances one card instead of coasting through several.
+const WHEEL_STEP_THRESHOLD = 60;
+// Minimum spacing between steps. Deliberately shorter than the card tween, so a
+// sustained scroll starts the next card before the last one has settled and the
+// deck streams instead of landing on every card in turn. A single flick is still
+// one crisp step — this only bites while the wheel is actually turning.
+const STEP_COOLDOWN_MS = 110;
+// Ceiling on unspent wheel travel, so one violent flick can't queue a long run
+// of steps that keeps firing after the gesture is over.
+const WHEEL_MAX_PENDING = WHEEL_STEP_THRESHOLD * 4;
 
 export function PortfolioClient({ projects }: { projects: Project[] }) {
   const totalCount = projects.length;
@@ -39,7 +53,7 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
   const goToIndex = useCallback(
     (newIndex: number, direction?: 'up' | 'down', stepDelta?: number) => {
       const now = Date.now();
-      if (now - lastTriggerTimeRef.current < 150) return;
+      if (now - lastTriggerTimeRef.current < STEP_COOLDOWN_MS) return;
 
       const wrappedIndex = ((newIndex % totalCount) + totalCount) % totalCount;
       const dir = direction || (newIndex > currentIndex ? 'down' : 'up');
@@ -58,24 +72,32 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
       if (selectedProject || activeSection !== 'work') return;
       e.preventDefault();
 
-      wheelDeltaRef.current += e.deltaY;
+      wheelDeltaRef.current = Math.max(
+        -WHEEL_MAX_PENDING,
+        Math.min(WHEEL_MAX_PENDING, wheelDeltaRef.current + e.deltaY),
+      );
 
+      // A pause discards the part-built step rather than carrying it over, so a
+      // gesture never leaks into the next one.
       if (wheelTimerRef.current) clearTimeout(wheelTimerRef.current);
       wheelTimerRef.current = setTimeout(() => {
-        wheelDeltaRef.current *= 0.3; // Liquid velocity decay
+        wheelDeltaRef.current = 0;
       }, 100);
 
-      const threshold = 18; // Micro-responsive threshold
-      if (Math.abs(wheelDeltaRef.current) >= threshold) {
+      if (Math.abs(wheelDeltaRef.current) >= WHEEL_STEP_THRESHOLD) {
         const now = Date.now();
-        if (now - lastTriggerTimeRef.current >= 150) {
-          if (wheelDeltaRef.current > 0) {
+        if (now - lastTriggerTimeRef.current >= STEP_COOLDOWN_MS) {
+          const direction = Math.sign(wheelDeltaRef.current);
+          if (direction > 0) {
             goToIndex(currentIndex - 1, 'up');
           } else {
             goToIndex(currentIndex + 1, 'down');
           }
-          // Liquid decay: retain partial residual momentum for continuous fluid scrolling
-          wheelDeltaRef.current *= 0.2;
+          // Spend exactly one step's worth and keep the remainder. Scroll travel
+          // then maps to cards proportionally, so a fast scroll keeps feeding the
+          // next step instead of throwing the excess away and stalling. It still
+          // can't coast: the idle timer clears whatever is left over.
+          wheelDeltaRef.current -= direction * WHEEL_STEP_THRESHOLD;
         }
       }
     };
@@ -146,7 +168,16 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
           onGoToIndex={goToIndex}
         />
 
-        <CardDeck
+        {/* <CardDeck
+          projects={projects}
+          currentIndex={currentIndex}
+          onGoToIndex={goToIndex}
+          onSelectProject={(project) => {
+            setSelectedProject(project);
+            showToast(`Viewing: ${project.title}`);
+          }}
+        /> */}
+        <CardDeck2
           projects={projects}
           currentIndex={currentIndex}
           onGoToIndex={goToIndex}

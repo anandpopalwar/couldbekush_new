@@ -94,10 +94,25 @@ Invisible Arc (bottom half): Top cards → Bottom cards (instant, opacity 0)
 - `inkSubtle`: #b0b0ac (tertiary text)
 
 ### Typography
-- Sans: Inter (variable font)
+- Sans: Inter (variable font, `opsz` axis enabled)
 - Mono: JetBrains Mono (variable font)
-- Tight tracking on headings
-- Widest tracking on labels
+- `.font-display` = Inter Display (opsz 32) for titles; `.font-text` = opsz 14 (the default)
+
+Scale from the AlignUI "Typography [Overview]" sheet, defined as Tailwind
+`fontSize` tokens — each token already carries size, line height, tracking and
+weight, so one `text-*` class is the whole style.
+
+| Token | Size/Leading | Tracking | Weight |
+|-------|--------------|----------|--------|
+| `text-title-h1` … `h3` | 56/64, 48/56, 40/48 | -1% | 500 |
+| `text-title-h4` | 32/40 | -0.5% | 500 |
+| `text-title-h5`, `h6` | 24/32, 20/28 | 0 | 500 |
+| `text-label-xl` … `xs` | 24/32, 18/24, 16/24, 14/20, 12/16 | -1.5%, -1.5%, -1.1%, -0.6%, 0 | 500 |
+| `text-paragraph-xl` … `xs` | same sizes as labels | same as labels | 400 |
+| `text-subheading-md` … `2xs` | 16/24, 14/20, 12/16, 11/12 | 6%, 6%, 4%, 2% | 500 |
+| `text-doc-label` / `text-doc-paragraph` | 18/32 | -1.5% | 500 / 400 |
+
+- Titles pair with `font-display`; subheadings are drawn for `uppercase`.
 
 ### Interactions
 - Wheel scroll: threshold 18px, 150ms cooldown

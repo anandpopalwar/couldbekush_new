@@ -9,6 +9,12 @@
     box-sizing: border-box;
   }
 
+  /* Default to Inter's text optical size; `.font-display` opts into opsz 32
+     ("Inter Display"), which the title tokens are drawn for. */
+  html {
+    font-variation-settings: "opsz" 14;
+  }
+
   body {
     background-color: #e6e6e4;
     background-image: 
@@ -19,6 +25,20 @@
     overflow: hidden;
     touch-action: none;
   }
+}
+
+/* ── Typography ────────────────────────────────────────────────────────────
+   The scale itself lives in tailwind.config.ts as `text-title-*`,
+   `text-label-*`, `text-paragraph-*`, `text-subheading-*` and `text-doc-*`;
+   each token carries its own size, line height, tracking and weight.
+   These two classes switch Inter's optical size, which no `text-*` token can
+   set on its own. Titles want display; everything else wants text.          */
+.font-display {
+  font-variation-settings: "opsz" 32;
+}
+
+.font-text {
+  font-variation-settings: "opsz" 14;
 }
 
 /* Hide standard scrollbars */

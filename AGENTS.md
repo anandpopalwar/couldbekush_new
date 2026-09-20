@@ -60,8 +60,10 @@ reference but is commented out.
   half the card on screen, half cut off — so the distance is viewport-relative
   (`innerHeight / 2`), not a fixed pixel gap. Slot ±2 is a full card height
   beyond that, off screen, and is where cards mount and unmount.
-- Centre card is `CENTER_SCALE` (1.3x); depth is carried by scale alone since a
-  vertical stack has no diagonal offset to read it from. No card shadows.
+- Centre card is `CENTER_SCALE` (1.3x); depth is carried by scale and a
+  depth-of-field blur (`SLOT_BLUR`) since a vertical stack has no diagonal
+  offset to read it from. `filter` is part of `SlotPose`, so blur interpolates
+  with position — a card sharpens as it travels into centre. No card shadows.
 - **Intro, once per load**: the deck is set down as a loose hand-stacked pile
   (deterministic per-card jitter), squares up, then cards are flicked out one at
   a time with a spin that unwinds on landing, on an uneven dealer's rhythm
@@ -98,17 +100,35 @@ Invisible Arc (bottom half): Top cards → Bottom cards (instant, opacity 0)
 ```
 
 ### RightSidebar.tsx
-- Infinite scroll track with 5 repeated project sets (40 items)
-- Centered viewport with smooth GSAP transitions (0.38s)
-- Auto-recenters virtual index at boundaries
-- **Center item always bold**: font-black, text-ink, larger sizes
-- Non-center items: opacity-15, muted gray colors
+- Fixed track of `2*SLOT_RADIUS + 1` slots; a step relabels every slot and
+  compensates the track so the picture is unchanged, then glides one card
+  (0.38s). The track never scrolls more than one card, so a runaway sweep is
+  structurally impossible.
+- **Emphasis follows position, not selection.** A slot's colour, size, tracking
+  and opacity are derived from its real distance from the viewport centre and
+  repainted on every frame of the glide. A boolean `isCenter` can't work here:
+  slots are relabeled the instant the selection changes, so the incoming card
+  would be fully styled while still a whole slot away, and no element ever
+  changes class so a CSS transition would never fire.
+  - `slotEmphasis()` → 1 dead centre, 0 a full slot away; `CENTER_RAMP` is the
+    exponent, i.e. how late the emphasis arrives (higher = later).
+  - `slotFade()` is the old `0.52^d` falloff made continuous.
+  - Both collapse to the previous values at rest, so nothing changes visually
+    when the list is still.
+  - Size and tracking interpolate in CSS against a `--u` custom property
+    (`.rs-*` rules in globals.css); colour and opacity are written inline by the
+    same pass. First render computes the rest values inline so SSR matches.
 - Color swatches on active item
 
 ### LeftSidebar.tsx
 - Navigation menu (WORK, ABOUT, PLAYGROUND, CONTACT)
 - Project metadata grid (Role, Launch, Recognition)
-- Large project counter (e.g., "01/08")
+- Large project counter (e.g., "01/08"), centred on the **screen** via
+  `left-0 w-screen flex justify-center` — the aside is only 3 of 12 columns but
+  starts at the viewport edge. Never centre it with `-translate-x-1/2` or
+  `position: fixed`: both create a stacking context, and the counter's
+  `mix-blend-difference` would then blend against that instead of `main`'s
+  background and the cards, rendering the number solid white.
 
 ### useAudioFeedback.ts
 - Web Audio API synthesis

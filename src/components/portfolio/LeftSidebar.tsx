@@ -149,12 +149,16 @@ export function LeftSidebar({
       </div>
 
       {/* Bottom selected work counter — huge number overlapping the card deck (z above cards,
-          pointer-events-none so it doesn't block card interaction). */}
-      <div className="absolute bottom-2 left-[50%] pointer-events-none">
+          pointer-events-none so it doesn't block card interaction).
+
+          Centred on the screen, not on this aside: the aside is only 3 of 12 columns but
+          starts at the viewport's left edge, so left-0 + w-screen spans the window and the
+          flex centres the group inside it. Do NOT swap this for -translate-x-1/2 or
+          position:fixed — both create a stacking context, and the number below would then
+          blend against that instead of against main's background and the cards, which
+          renders it solid white. */}
+      <div className="absolute bottom-2 left-0 w-screen flex justify-center pointer-events-none">
         <div className="flex items-start gap-x-4">
-          <span className="text-[10px] tracking-wide text-inkMuted mt-3 whitespace-nowrap">
-            Selected work
-          </span>
           <span
             ref={counterRef}
             className="text-[8rem] md:text-[10rem] lg:text-[12rem] font-medium tracking-tight text-white mix-blend-difference inline-block leading-none tabular-nums"

@@ -41,6 +41,37 @@
   font-variation-settings: "opsz" 14;
 }
 
+/* ── Right sidebar list ────────────────────────────────────────────────────
+   Each slot carries --u: 0 = plain, 1 = selected, set from its real distance
+   from the viewport centre (see RightSidebar.tsx). Size and tracking are
+   interpolated against it so a card grows into its selected state as it
+   arrives, instead of switching the moment the selection changes — the list
+   is still gliding for 0.38s after that. Colour and opacity are set inline by
+   the same pass. At rest these resolve to the plain/selected values exactly. */
+.rs-sub {
+  font-size: calc(9px + 1.5px * var(--u, 0));
+  letter-spacing: calc(0.1em * var(--u, 0));
+}
+
+.rs-title {
+  font-size: calc(14px + 5px * var(--u, 0));
+  letter-spacing: calc(-0.025em * var(--u, 0));
+}
+
+@media (min-width: 768px) {
+  .rs-title {
+    font-size: calc(14px + 7px * var(--u, 0));
+  }
+}
+
+.rs-dash {
+  font-size: calc(10px + 4px * var(--u, 0));
+}
+
+.rs-desc {
+  font-size: calc(10px + 2px * var(--u, 0));
+}
+
 /* Hide standard scrollbars */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

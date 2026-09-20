@@ -51,6 +51,9 @@ const OFFSCREEN_STEP = 280;
 // read depth from, so scale carries it.
 const SLOT_SCALE = [0.94, 0.88, 0.84];
 const SLOT_OPACITY = [0.96, 0.9, 0.9];
+// Depth of field — only the selected card is in focus. GSAP interpolates the
+// blur along with position, so a card sharpens as it travels into centre.
+const SLOT_BLUR = [3, 6, 6];
 
 // Card movement. Short and crisp on purpose — a long duration with a deep
 // ease-out tail (the old 0.65s / power3.out) reads as a floaty glide rather than
@@ -110,6 +113,7 @@ interface SlotPose {
   scale: number;
   opacity: number;
   zIndex: number;
+  filter: string;
 }
 
 /**
@@ -121,7 +125,15 @@ interface SlotPose {
 function slotPose(offset: number, viewportHeight: number): SlotPose {
   const depth = Math.abs(offset);
   if (depth === 0) {
-    return { x: 0, y: 0, rotation: 0, scale: CENTER_SCALE, opacity: 1, zIndex: 40 };
+    return {
+      x: 0,
+      y: 0,
+      rotation: 0,
+      scale: CENTER_SCALE,
+      opacity: 1,
+      zIndex: 40,
+      filter: "blur(0px)",
+    };
   }
   const step = Math.min(depth, SLOT_SCALE.length) - 1;
   return {
@@ -132,11 +144,12 @@ function slotPose(offset: number, viewportHeight: number): SlotPose {
     scale: SLOT_SCALE[step],
     opacity: SLOT_OPACITY[step],
     zIndex: 40 - depth,
+    filter: `blur(${SLOT_BLUR[step]}px)`,
   };
 }
 
 function poseSignature(pose: SlotPose) {
-  return `${pose.y}|${pose.scale}|${pose.opacity}|${pose.zIndex}`;
+  return `${pose.y}|${pose.scale}|${pose.opacity}|${pose.zIndex}|${pose.filter}`;
 }
 
 /** Shortest signed step from one wrapped index to another. */
@@ -290,6 +303,10 @@ export function CardDeck2({
             scale: pile.scale * INTRO_POP_FROM,
             opacity: 0,
             zIndex: pose.zIndex,
+            // The pile is sharp — cards blur only once they're dealt away from
+            // centre. Stated as blur(0px) rather than left unset so the deal
+            // tween has a number to interpolate from.
+            filter: "blur(0px)",
           });
 
           // It lands and squares up — the tap that straightens a deck.

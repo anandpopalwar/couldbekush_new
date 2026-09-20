@@ -37,8 +37,28 @@ const MIN_FADE = 0.1;
 // the card plain until it is nearly centred, then commits quickly.
 const CENTER_RAMP = 2.2;
 
-const PLAIN_RGB = [156, 163, 175]; // gray-400
-const INK_RGB = [17, 17, 17]; // ink
+// Read straight from the design tokens so the ramp can't drift from the rest of
+// the palette. Resolved once on first use — the tokens are static.
+let rampCache: { plain: number[]; ink: number[] } | null = null;
+
+function readChannels(token: string, fallback: number[]) {
+  if (typeof window === "undefined") return fallback;
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue(token)
+    .trim();
+  const channels = raw.split(/[\s,]+/).map(Number).filter((n) => !Number.isNaN(n));
+  return channels.length === 3 ? channels : fallback;
+}
+
+function ramp() {
+  if (!rampCache) {
+    rampCache = {
+      plain: readChannels("--color-ink-plain", [156, 163, 175]),
+      ink: readChannels("--color-ink", [17, 17, 17]),
+    };
+  }
+  return rampCache;
+}
 
 function slotFade(distance: number) {
   return Math.max(MIN_FADE, Math.pow(SLOT_FALLOFF, distance));
@@ -50,8 +70,9 @@ function slotEmphasis(distance: number) {
 }
 
 function slotColor(emphasis: number) {
+  const { plain, ink } = ramp();
   const channel = (i: number) =>
-    Math.round(PLAIN_RGB[i] + (INK_RGB[i] - PLAIN_RGB[i]) * emphasis);
+    Math.round(plain[i] + (ink[i] - plain[i]) * emphasis);
   return `rgb(${channel(0)}, ${channel(1)}, ${channel(2)})`;
 }
 
@@ -171,7 +192,7 @@ export function RightSidebar({
   const themeColors = projects[currentIndex]?.themeColors;
 
   return (
-    <aside className="hidden md:flex md:col-start-10 md:col-span-3 md:row-start-1 h-full flex-col justify-between pointer-events-auto pl-0 pr-30 overflow-hidden relative">
+    <aside className="hidden compact:flex compact:col-start-10 compact:col-span-3 compact:row-start-1 h-full flex-col justify-between pointer-events-auto pl-0 pr-30 overflow-hidden relative">
       <div
         ref={viewportRef}
         className="w-full h-full relative overflow-hidden touch-none"
@@ -210,13 +231,15 @@ export function RightSidebar({
                 }
                 className="rs-slot h-[150px] relative flex flex-col items-center justify-center text-center cursor-pointer select-none px-0 pr-28 "
               >
-                <span className="rs-sub uppercase mb-1">{project.subtitle}</span>
+                <span className="rs-sub font-code uppercase mb-1">
+                  {project.subtitle}
+                </span>
 
                 <h4 className="rs-title uppercase">{project.title}</h4>
 
                 <span className="rs-dash my-1">—</span>
 
-                <p className="rs-desc max-w-[280px] line-clamp-3 leading-snug">
+                <p className="rs-desc max-w-[280px] line-clamp-3">
                   {project.description}
                 </p>
               </div>
@@ -239,10 +262,10 @@ export function RightSidebar({
         </div>
       )}
 
-      <div className="absolute bottom-6 right-6 z-30 font-mono text-[10px] font-bold text-ink uppercase tracking-wider flex items-center space-x-1 hover:opacity-75 transition-opacity cursor-pointer">
+      {/* <div className="absolute bottom-6 right-6 z-30 font-mono text-micro-md font-bold text-ink uppercase tracking-wider flex items-center space-x-1 hover:opacity-75 transition-opacity cursor-pointer">
         <span className="underline font-black">'25 showreel</span>
-        <span className="text-[8px]">▶</span>
-      </div>
+        <span className="text-micro-xs">▶</span>
+      </div> */}
     </aside>
   );
 }

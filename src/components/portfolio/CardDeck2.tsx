@@ -1,81 +1,69 @@
-"use client";
+'use client';
 
 import {
+  MutableRefObject,
   useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
-} from "react";
-import Image from "next/image";
-import gsap from "gsap";
-import { Project } from "@/types/portfolio";
-import { ChevronDown } from "lucide-react";
+} from 'react';
+import Image from 'next/image';
+import gsap from 'gsap';
+import { Project } from '@/types/portfolio';
+import { ChevronDown } from 'lucide-react';
 
 /**
- * CardDeck2 — vertical deck, conveyor flow.
+ * CardDeck2 — vertical deck, driven by a continuous position.
  *
- * The deck is a conveyor, not a carousel. Rather than cycling one DOM node per
- * project around a ring — which forces a card to teleport from the top of the
- * stack back to the bottom, the jump you catch when scrolling fast — this
- * renders a short window of slots around the current position, each one keyed by
- * an ever-increasing virtual index.
+ * The deck's state is a single float in `positionRef`: card units, where an
+ * integer centres that card and 4.5 sits exactly between two. Input writes to
+ * it directly and this component renders whatever it currently says, once per
+ * frame. There are no per-card tweens and no stepping — the deck can sit
+ * between cards, which is what lets a scroll be followed as it happens and
+ * snapped only when it stops.
  *
- * Because the key never repeats, a card element is never reused for a different
- * position: it mounts one slot beyond the deck (off screen), slides inward as
- * the deck advances, and unmounts one slot past the far side, also off screen.
- * The only motion visible on screen is a card travelling straight up or straight
- * down. There is no wrap, no teleport, and nothing to catch.
- *
- * `currentIndex` from the parent is wrapped to 0..n-1, so it can't tell +1 from
- * a wrap of -7. The deck keeps its own unbounded `virtual` counter and advances
- * it by the shortest signed path each time the prop changes.
+ * Windowing is still a conveyor: a short ring of slots around the rounded
+ * position, each keyed by its virtual index. Keys never repeat, so a card
+ * element is never reused for another position and there is no wrap to catch.
+ * Cards mount and unmount beyond the screen edge.
  */
 
 // Selected card, blown up relative to the deck's base card size.
 const CENTER_SCALE = 1.3;
 
-// Slots rendered either side of centre. Slot ±1 is half off screen; slot ±2 is
-// fully off screen and is where cards mount and unmount.
+// Slots either side of centre that can be on screen. ±1 is half off screen.
 const HALF_WINDOW = 2;
+// One extra ring stays mounted so a card leaving is never torn off mid-travel.
+const MOUNT_RADIUS = HALF_WINDOW + 1;
 
 // Slot ±1 is parked with its centre on the viewport edge — half the card shows,
 // half is cut off. SLOT_NUDGE shifts that (negative = more card on screen).
 const SLOT_NUDGE = 0;
-
 // Distance added per slot beyond the first. Roughly one card height, so slot ±2
 // clears the screen edge completely and mount/unmount can never be seen.
 const OFFSCREEN_STEP = 280;
 
-// Depth cues, index = |offset| - 1. A vertical stack has no diagonal offset to
-// read depth from, so scale carries it.
-const SLOT_SCALE = [0.94, 0.88, 0.84];
-const SLOT_OPACITY = [0.96, 0.9, 0.9];
-// Depth of field — only the selected card is in focus. GSAP interpolates the
-// blur along with position, so a card sharpens as it travels into centre.
-const SLOT_BLUR = [3, 6, 6];
+// Depth ramps, index = distance from centre in cards. Read continuously, so a
+// card halfway between two slots gets values halfway between two entries.
+const SCALE_RAMP = [CENTER_SCALE, 0.94, 0.88, 0.84];
+const OPACITY_RAMP = [1, 0.96, 0.9, 0.9];
+// Depth of field — only the selected card is in focus.
+const BLUR_RAMP = [0, 3, 6, 6];
 
-// Card movement. Short and crisp on purpose — a long duration with a deep
-// ease-out tail (the old 0.65s / power3.out) reads as a floaty glide rather than
-// a deck of cards being dealt. Swap EASE for "back.out(1.4)" if you want the
-// card to slam past its slot and settle, or "none" for a fully mechanical step.
-const DURATION = 0.3;
-const EASE = "power2.out";
+// Pointer drag: how far you pull for one card.
+const DRAG_TRAVEL_PER_CARD = 220;
 
 // Intro, once per page load, and the only motion on the page that nobody asked
 // for — so it gets one gesture, borrowed from handling an actual deck: the cards
 // are set down as a loose pile, squared up, then flicked out one at a time.
-const INTRO_DROP = 44; // height the pile is set down from
-const INTRO_POP_FROM = 0.9; // pile starts at this fraction of centre scale
+const INTRO_DROP = 44;
+const INTRO_POP_FROM = 0.9;
 const INTRO_SQUARE_DURATION = 0.45;
-const INTRO_SQUARE_EASE = "back.out(1.6)";
+const INTRO_SQUARE_EASE = 'back.out(1.6)';
 const INTRO_DEAL_DURATION = 0.52;
-// Slight overshoot on landing — a dealt card is flicked, not placed.
-const INTRO_DEAL_EASE = "back.out(1.1)";
-// Spin a card carries off the pile, unwound by the time it lands.
+const INTRO_DEAL_EASE = 'back.out(1.1)';
 const INTRO_KICK_DEG = 7;
-// Uneven gaps between deals, in order +1, -1, +2, -2. An even stagger is a
-// metronome; a hand dealing cards isn't one.
 const INTRO_BEATS = [0, 0.09, 0.26, 0.35];
 const INTRO_TOTAL_MS =
   (INTRO_SQUARE_DURATION +
@@ -83,10 +71,7 @@ const INTRO_TOTAL_MS =
     INTRO_DEAL_DURATION) *
   1000;
 
-/**
- * Deterministic per-card offset for the starting pile, so it looks hand-stacked
- * rather than machine-aligned — and looks identical on every load.
- */
+/** Deterministic per-card offset, so the pile looks hand-stacked and identical on every load. */
 function pileJitter(key: number) {
   const hash = (seed: number) => {
     const value = Math.sin(key * seed) * 43758.5453;
@@ -101,9 +86,17 @@ function pileJitter(key: number) {
 
 function prefersReducedMotion() {
   return (
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
   );
+}
+
+/** Read a depth ramp at a fractional distance. */
+function ramp(values: number[], depth: number) {
+  const t = Math.min(Math.max(depth, 0), values.length - 1);
+  const i = Math.floor(t);
+  const next = Math.min(i + 1, values.length - 1);
+  return values[i] + (values[next] - values[i]) * (t - i);
 }
 
 interface SlotPose {
@@ -117,52 +110,35 @@ interface SlotPose {
 }
 
 /**
- * Where a card sits for a given signed distance from centre. A resting pose is
- * always square — x and rotation are named explicitly so that a card caught
- * mid-intro, tilted and offset on the pile, is straightened by the next layout
- * rather than left crooked.
+ * Where a card sits for a signed distance from centre, in card units. Accepts
+ * fractions: at 0.5 the card is halfway to its neighbour's slot, half-scaled
+ * and half-blurred between the two. Rotation and x are always 0 — they exist so
+ * a card left crooked by the intro is straightened by the next frame.
  */
 function slotPose(offset: number, viewportHeight: number): SlotPose {
   const depth = Math.abs(offset);
-  if (depth === 0) {
-    return {
-      x: 0,
-      y: 0,
-      rotation: 0,
-      scale: CENTER_SCALE,
-      opacity: 1,
-      zIndex: 40,
-      filter: "blur(0px)",
-    };
-  }
-  const step = Math.min(depth, SLOT_SCALE.length) - 1;
+  const edge = viewportHeight / 2 + SLOT_NUDGE;
+  // Within one card of centre the travel is to the screen edge; beyond that
+  // each further card clears by a card height.
+  const distance =
+    depth <= 1 ? depth * edge : edge + (depth - 1) * OFFSCREEN_STEP;
+
   return {
     x: 0,
     rotation: 0,
     // Upcoming projects (positive offset) stack above centre and travel down.
-    y: -Math.sign(offset) * (viewportHeight / 2 + SLOT_NUDGE + step * OFFSCREEN_STEP),
-    scale: SLOT_SCALE[step],
-    opacity: SLOT_OPACITY[step],
-    zIndex: 40 - depth,
-    filter: `blur(${SLOT_BLUR[step]}px)`,
+    y: -Math.sign(offset) * distance,
+    scale: ramp(SCALE_RAMP, depth),
+    opacity: ramp(OPACITY_RAMP, depth),
+    // Fine-grained so two cards straddling the centre never tie.
+    zIndex: Math.round(100 - depth * 10),
+    filter: `blur(${ramp(BLUR_RAMP, depth).toFixed(2)}px)`,
   };
-}
-
-function poseSignature(pose: SlotPose) {
-  return `${pose.y}|${pose.scale}|${pose.opacity}|${pose.zIndex}|${pose.filter}`;
-}
-
-/** Shortest signed step from one wrapped index to another. */
-function shortestDelta(from: number, to: number, count: number) {
-  let delta = to - from;
-  while (delta > count / 2) delta -= count;
-  while (delta < -count / 2) delta += count;
-  return delta;
 }
 
 function windowAround(centre: number) {
   const keys: number[] = [];
-  for (let offset = -HALF_WINDOW; offset <= HALF_WINDOW; offset++) {
+  for (let offset = -MOUNT_RADIUS; offset <= MOUNT_RADIUS; offset++) {
     keys.push(centre + offset);
   }
   return keys;
@@ -170,56 +146,64 @@ function windowAround(centre: number) {
 
 interface CardDeck2Props {
   projects: Project[];
-  currentIndex: number;
-  onGoToIndex: (
-    index: number,
-    direction?: "up" | "down",
-    stepDelta?: number,
-  ) => void;
+  /** Live deck position in card units. Input writes here; the deck renders it. */
+  positionRef: MutableRefObject<number>;
+  /** The centred card changed — wrapped project index, and which way it moved. */
+  onCentreChange: (index: number, direction: 'up' | 'down') => void;
+  onGoToIndex: (index: number, direction?: 'up' | 'down') => void;
   onSelectProject: (project: Project) => void;
+  /** Settle onto the nearest card, e.g. when a drag is released. */
+  onSettle: () => void;
+  /** Stop any in-flight settle, e.g. when a drag starts. */
+  onGrab: () => void;
 }
 
 export function CardDeck2({
   projects,
-  currentIndex,
+  positionRef,
+  onCentreChange,
   onGoToIndex,
   onSelectProject,
+  onSettle,
+  onGrab,
 }: CardDeck2Props) {
   const totalCount = projects.length;
 
   const stageRef = useRef<HTMLDivElement>(null);
   const cardsRef = useRef<Map<number, HTMLDivElement>>(new Map());
-  // Keys already positioned at least once — anything else is entering.
-  const placedRef = useRef<Set<number>>(new Set());
-  // Last target applied per key, so a re-render (a card unmounting, say) doesn't
-  // restart every in-flight tween against the pose it is already heading for.
-  const poseRef = useRef<Map<number, string>>(new Map());
-  // Unbounded position counter; `currentIndex` is its wrapped shadow.
-  const virtualRef = useRef(currentIndex);
-  // Direction of the last move, so a card entering at centre (a multi-step jump)
-  // still knows which side to come in from.
-  const travelRef = useRef(1);
-  const initialKeyRef = useRef(currentIndex);
-  // The deal-out intro, and its queued tweens so an early scroll can cancel them.
-  const introPendingRef = useRef(true);
-  const introTweensRef = useRef<gsap.core.Tween[]>([]);
 
-  const [virtual, setVirtual] = useState(currentIndex);
-  // Mounted keys: the live window plus any card still animating off the deck.
-  const [slots, setSlots] = useState<number[]>(() => windowAround(currentIndex));
+  const startPosition = useRef(Math.round(positionRef.current));
+  const centreRef = useRef(startPosition.current);
+  const [centreKey, setCentreKey] = useState(startPosition.current);
+  const [slots, setSlots] = useState<number[]>(() =>
+    windowAround(startPosition.current),
+  );
+
+  // While the intro plays it owns the cards; the frame loop stands off.
+  const introPendingRef = useRef(true);
+  const introActiveRef = useRef(true);
+  const introTweensRef = useRef<gsap.core.Tween[]>([]);
 
   const [hintVisible, setHintVisible] = useState(false);
   const isDraggingRef = useRef(false);
-  const startYRef = useRef(0);
-  const dragDeltaRef = useRef(0);
+  const dragStartYRef = useRef(0);
+  const dragStartPositionRef = useRef(0);
 
   const projectFor = useCallback(
     (key: number) => projects[((key % totalCount) + totalCount) % totalCount],
     [projects, totalCount],
   );
 
-  // The hint waits for the deal to finish rather than talking over it, then
-  // shows for 4.5s.
+  const viewportHeight = () =>
+    typeof window !== 'undefined' ? window.innerHeight : 900;
+
+  const endIntro = useCallback(() => {
+    introTweensRef.current.forEach((tween) => tween.kill());
+    introTweensRef.current = [];
+    introActiveRef.current = false;
+  }, []);
+
+  // The hint waits for the deal rather than talking over it.
   useEffect(() => {
     const start = prefersReducedMotion() ? 0 : INTRO_TOTAL_MS;
     const show = setTimeout(() => setHintVisible(true), start);
@@ -230,227 +214,144 @@ export function CardDeck2({
     };
   }, []);
 
-  // Follow the parent's wrapped index with an unbounded counter. Both state
-  // updates batch, so the render that moves the deck already carries the
-  // departing cards — they animate off instead of vanishing.
-  useEffect(() => {
-    const wrapped =
-      ((virtualRef.current % totalCount) + totalCount) % totalCount;
-    const delta = shortestDelta(wrapped, currentIndex, totalCount);
-    if (delta === 0) return;
-
-    const next = virtualRef.current + delta;
-    virtualRef.current = next;
-    travelRef.current = Math.sign(delta);
-    setVirtual(next);
-    setSlots((prev) =>
-      Array.from(new Set([...prev, ...windowAround(next)])).sort((a, b) => a - b),
-    );
-  }, [currentIndex, totalCount]);
-
-  const layoutDeck = useCallback(
-    // `force` re-settles a card whose target hasn't changed but whose transform
-    // was moved out from under the deck — a released drag.
-    (immediate = false, force = false) => {
-      const viewportHeight =
-        typeof window !== "undefined" ? window.innerHeight : 900;
-      const centre = virtualRef.current;
-
-      // Kill any queued intro tween before a normal layout runs. A tween still
-      // waiting on its delay isn't "active", so GSAP's overwrite:"auto" won't
-      // catch it — it would fire later and yank the card back to its intro slot.
-      if (introTweensRef.current.length) {
-        introTweensRef.current.forEach((tween) => tween.kill());
-        introTweensRef.current = [];
-        // Those cards were recorded as already at their final pose; clear that so
-        // the layout below always re-applies rather than skipping as unchanged.
-        slots.forEach((key) => poseRef.current.delete(key));
-      }
-
-      // Deal-out intro, first layout only.
-      if (introPendingRef.current && !immediate) {
-        introPendingRef.current = false;
-        const reducedMotion = prefersReducedMotion();
-        const pile = slotPose(0, viewportHeight);
-
-        slots.forEach((key) => {
-          const el = cardsRef.current.get(key);
-          if (!el) return;
-
-          const offset = key - centre;
-          const depth = Math.abs(offset);
-          const pose = slotPose(offset, viewportHeight);
-
-          placedRef.current.add(key);
-          poseRef.current.set(key, poseSignature(pose));
-          el.style.pointerEvents = depth <= 1 ? "auto" : "none";
-
-          // Unasked-for motion is the first thing to drop for anyone who has
-          // asked not to see it. The deck is simply already dealt.
-          if (reducedMotion) {
-            gsap.set(el, pose);
-            return;
-          }
-
-          // The deck is set down as one loose pile, a little above centre and a
-          // little undersized. zIndex is already final, so the selected card is
-          // the one on top.
-          const jitter = pileJitter(key);
-          gsap.set(el, {
-            x: jitter.x,
-            y: pile.y - INTRO_DROP + jitter.y,
-            rotation: jitter.rotation,
-            scale: pile.scale * INTRO_POP_FROM,
-            opacity: 0,
-            zIndex: pose.zIndex,
-            // The pile is sharp — cards blur only once they're dealt away from
-            // centre. Stated as blur(0px) rather than left unset so the deal
-            // tween has a number to interpolate from.
-            filter: "blur(0px)",
-          });
-
-          // It lands and squares up — the tap that straightens a deck.
-          introTweensRef.current.push(
-            gsap.to(el, {
-              x: 0,
-              y: pile.y,
-              rotation: 0,
-              scale: pile.scale,
-              opacity: 1,
-              duration: INTRO_SQUARE_DURATION,
-              ease: INTRO_SQUARE_EASE,
-            }),
-          );
-
-          // The selected card is already home — it lands and stays.
-          if (depth === 0) return;
-
-          // Then cards are flicked off the pile, nearest pair first, up before
-          // down. Each leaves with a kick of spin that unwinds as it lands.
-          const order = (depth - 1) * 2 + (offset > 0 ? 0 : 1);
-          const beat = INTRO_BEATS[Math.min(order, INTRO_BEATS.length - 1)];
-          introTweensRef.current.push(
-            gsap.to(el, {
-              ...pose,
-              rotation: 0,
-              startAt: { rotation: Math.sign(offset) * INTRO_KICK_DEG },
-              duration: INTRO_DEAL_DURATION,
-              delay: INTRO_SQUARE_DURATION + beat,
-              ease: INTRO_DEAL_EASE,
-            }),
-          );
-        });
-        return;
-      }
-
-      slots.forEach((key) => {
-        const el = cardsRef.current.get(key);
-        if (!el) return;
-
-        const offset = key - centre;
-        const depth = Math.abs(offset);
-        const leaving = depth > HALF_WINDOW;
-        // A leaving card keeps going one slot past the deck, then unmounts.
-        const pose = slotPose(
-          leaving ? Math.sign(offset) * (HALF_WINDOW + 1) : offset,
-          viewportHeight,
-        );
-
-        // Cards can only be clicked where they're actually visible.
-        el.style.pointerEvents = depth <= 1 ? "auto" : "none";
-
-        if (!placedRef.current.has(key)) {
-          // First placement: start one slot beyond the deck, on the side this
-          // card is arriving from. Always off screen, so it can only slide in.
-          placedRef.current.add(key);
-          const entrySide = Math.sign(offset) || travelRef.current;
-          gsap.set(el, slotPose(entrySide * (HALF_WINDOW + 1), viewportHeight));
-        }
-
-        const signature = poseSignature(pose);
-        const unchanged = poseRef.current.get(key) === signature;
-        poseRef.current.set(key, signature);
-
-        if (immediate) {
-          gsap.set(el, pose);
-          return;
-        }
-
-        if (unchanged && !force) return;
-
-        gsap.to(el, {
-          ...pose,
-          duration: DURATION,
-          ease: EASE,
-          overwrite: "auto",
-          onComplete: leaving
-            ? () => {
-                // It may have been scrolled back into the window mid-flight.
-                if (Math.abs(key - virtualRef.current) <= HALF_WINDOW) return;
-                placedRef.current.delete(key);
-                poseRef.current.delete(key);
-                cardsRef.current.delete(key);
-                setSlots((prev) => prev.filter((k) => k !== key));
-              }
-            : undefined,
-        });
-      });
+  // Place a card the moment it mounts, before paint, so a card entering the
+  // window is never visible for a frame at its untransformed size.
+  const placeCard = useCallback(
+    (el: HTMLDivElement, key: number) => {
+      if (introActiveRef.current) return;
+      gsap.set(el, slotPose(key - positionRef.current, viewportHeight()));
     },
-    [slots],
+    [positionRef],
   );
 
-  useLayoutEffect(() => {
-    layoutDeck();
-  }, [layoutDeck, virtual]);
-
-  // Window resize — the slot distances are viewport-relative, so recompute.
+  // The frame loop: render whatever position currently says. This is the whole
+  // motion model — no tweens per card, so the deck can rest between two cards
+  // and follow input continuously.
   useEffect(() => {
-    const handleResize = () => layoutDeck(true);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [layoutDeck]);
+    const tick = () => {
+      const centre = positionRef.current;
 
-  // Pointer drag gestures
+      if (introActiveRef.current) {
+        // An early scroll cancels the intro and hands the deck over.
+        if (centre !== startPosition.current) endIntro();
+        else return;
+      }
+
+      const vh = viewportHeight();
+      cardsRef.current.forEach((el, key) => {
+        const offset = key - centre;
+        gsap.set(el, slotPose(offset, vh));
+        el.style.pointerEvents = Math.abs(offset) <= 1 ? 'auto' : 'none';
+      });
+
+      const rounded = Math.round(centre);
+      if (rounded !== centreRef.current) {
+        const direction = rounded > centreRef.current ? 'down' : 'up';
+        centreRef.current = rounded;
+        setCentreKey(rounded);
+        setSlots(windowAround(rounded));
+        onCentreChange(
+          ((rounded % totalCount) + totalCount) % totalCount,
+          direction,
+        );
+      }
+    };
+
+    gsap.ticker.add(tick);
+    return () => {
+      gsap.ticker.remove(tick);
+    };
+  }, [positionRef, onCentreChange, totalCount, endIntro]);
+
+  // Deal-out intro, first layout only.
+  useLayoutEffect(() => {
+    if (!introPendingRef.current) return;
+    introPendingRef.current = false;
+
+    const vh = viewportHeight();
+    const centre = startPosition.current;
+    const reducedMotion = prefersReducedMotion();
+    const pile = slotPose(0, vh);
+
+    if (reducedMotion) {
+      introActiveRef.current = false;
+      return;
+    }
+
+    slots.forEach((key) => {
+      const el = cardsRef.current.get(key);
+      if (!el) return;
+
+      const offset = key - centre;
+      const depth = Math.abs(offset);
+      const pose = slotPose(offset, vh);
+
+      // The deck is set down as one loose pile, a little above centre.
+      const jitter = pileJitter(key);
+      gsap.set(el, {
+        x: jitter.x,
+        y: pile.y - INTRO_DROP + jitter.y,
+        rotation: jitter.rotation,
+        scale: pile.scale * INTRO_POP_FROM,
+        opacity: 0,
+        zIndex: pose.zIndex,
+        filter: 'blur(0px)',
+      });
+
+      introTweensRef.current.push(
+        gsap.to(el, {
+          x: 0,
+          y: pile.y,
+          rotation: 0,
+          scale: pile.scale,
+          opacity: 1,
+          duration: INTRO_SQUARE_DURATION,
+          ease: INTRO_SQUARE_EASE,
+        }),
+      );
+
+      if (depth === 0) return;
+
+      const order = (depth - 1) * 2 + (offset > 0 ? 0 : 1);
+      const beat = INTRO_BEATS[Math.min(order, INTRO_BEATS.length - 1)];
+      introTweensRef.current.push(
+        gsap.to(el, {
+          ...pose,
+          rotation: 0,
+          startAt: { rotation: Math.sign(offset) * INTRO_KICK_DEG },
+          duration: INTRO_DEAL_DURATION,
+          delay: INTRO_SQUARE_DURATION + beat,
+          ease: INTRO_DEAL_EASE,
+        }),
+      );
+    });
+
+    // Hand over to the frame loop once the last card has landed.
+    const handover = setTimeout(endIntro, INTRO_TOTAL_MS);
+    return () => clearTimeout(handover);
+  }, [slots, endIntro]);
+
+  // Pointer drag — the deck follows the pointer directly, then settles.
   const handlePointerDown = (e: React.PointerEvent) => {
     isDraggingRef.current = true;
-    startYRef.current = e.clientY;
-    dragDeltaRef.current = 0;
+    dragStartYRef.current = e.clientY;
+    dragStartPositionRef.current = positionRef.current;
+    onGrab();
+    endIntro();
     stageRef.current?.setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!isDraggingRef.current) return;
-    dragDeltaRef.current = e.clientY - startYRef.current;
-
-    const activeCard = cardsRef.current.get(virtualRef.current);
-    if (!activeCard) return;
-
-    // Drag feedback follows the deck's axis — straight up and down, no drift.
-    // The squeeze is proportional to CENTER_SCALE so the card shrinks away from
-    // its blown-up size instead of snapping down to the deck's base size.
-    gsap.set(activeCard, {
-      y: dragDeltaRef.current * 0.6,
-      scale:
-        CENTER_SCALE * (1 - Math.min(Math.abs(dragDeltaRef.current) * 0.0004, 0.08)),
-    });
+    const travelled = e.clientY - dragStartYRef.current;
+    positionRef.current =
+      dragStartPositionRef.current + travelled / DRAG_TRAVEL_PER_CARD;
   };
 
   const handlePointerUp = () => {
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
-
-    const delta = dragDeltaRef.current;
-    dragDeltaRef.current = 0;
-
-    if (delta < -45) {
-      onGoToIndex(currentIndex - 1, "up");
-    } else if (delta > 45) {
-      onGoToIndex(currentIndex + 1, "down");
-    } else {
-      // Under the threshold — settle the card back into centre from wherever the
-      // drag left it. Its target never changed, so this has to be forced.
-      layoutDeck(false, true);
-    }
+    onSettle();
   };
 
   return (
@@ -460,36 +361,41 @@ export function CardDeck2({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      className="col-span-1 md:col-start-4 md:col-span-6 md:row-start-1 h-full relative perspective-stage flex items-center justify-center pointer-events-auto cursor-grab active:cursor-grabbing overflow-visible touch-none select-none"
+      className="col-span-1 compact:col-start-4 compact:col-span-6 compact:row-start-1 h-full relative perspective-stage flex items-center justify-center pointer-events-auto cursor-grab active:cursor-grabbing overflow-visible touch-none select-none"
     >
       {/* Scaled card dimension stage — h-full + items-center puts the centre card
           on the exact vertical middle of the viewport. */}
-      <div className="relative w-[75vw] sm:w-[315px] md:w-[335px] lg:w-[370px] aspect-[4/3] flex items-center justify-center">
-        {/* Conveyor window */}
+      <div className="relative w-[var(--card-width)] aspect-[4/3] flex items-center justify-center">
         <div className="relative w-full h-full">
           {slots.map((key) => {
             const project = projectFor(key);
             if (!project) return null;
-            const isCenter = key === virtual;
+            const isCenter = key === centreKey;
 
             return (
               <div
                 key={key}
                 ref={(el) => {
-                  if (el) cardsRef.current.set(key, el);
-                  else cardsRef.current.delete(key);
+                  if (el) {
+                    cardsRef.current.set(key, el);
+                    placeCard(el, key);
+                  } else {
+                    cardsRef.current.delete(key);
+                  }
                 }}
                 onClick={() => {
-                  const offset = key - virtualRef.current;
-                  if (offset === 0) {
+                  if (isDraggingRef.current) return;
+                  if (key === Math.round(positionRef.current)) {
                     onSelectProject(project);
                     return;
                   }
-                  const index =
-                    ((key % totalCount) + totalCount) % totalCount;
-                  onGoToIndex(index, offset > 0 ? "down" : "up", offset);
+                  const index = ((key % totalCount) + totalCount) % totalCount;
+                  onGoToIndex(
+                    index,
+                    key > positionRef.current ? 'down' : 'up',
+                  );
                 }}
-                className="absolute inset-0 w-full h-full rounded-sm overflow-hidden bg-[#151515] will-change-transform select-none cursor-pointer group"
+                className="absolute inset-0 w-full h-full rounded-sm overflow-hidden bg-surface will-change-transform select-none cursor-pointer group"
                 data-key={key}
               >
                 <div className="relative w-full h-full overflow-hidden">
@@ -497,17 +403,11 @@ export function CardDeck2({
                     src={project.image}
                     alt={project.title}
                     fill
-                    // Sized for the centre card's blown-up footprint (base width
-                    // × CENTER_SCALE), otherwise the focal card upscales a 370px
-                    // source and looks soft.
-                    sizes="(max-width: 768px) 98vw, 481px"
-                    // Cards mount off screen, so lazy loading would let one slide
-                    // in empty. Eager everywhere; priority only for the first card
-                    // painted, which is the LCP candidate.
-                    priority={key === initialKeyRef.current}
+                    sizes="(max-width: 768px) 81vw, 416px"
+                    priority={key === startPosition.current}
                     loading="eager"
                     className={`object-cover object-center pointer-events-none transition-transform duration-500 ease-out ${
-                      isCenter ? "group-hover:scale-105" : "scale-100"
+                      isCenter ? 'group-hover:scale-105' : 'scale-100'
                     }`}
                   />
 
@@ -521,8 +421,8 @@ export function CardDeck2({
 
       {/* Floating drag hint overlay */}
       <div
-        className={`absolute bottom-6 flex items-center space-x-2 text-inkMuted text-[10px] font-mono tracking-widest uppercase pointer-events-none transition-opacity duration-700 ${
-          hintVisible ? "opacity-60" : "opacity-0"
+        className={`absolute bottom-6 flex items-center space-x-2 text-inkMuted text-micro-md font-mono tracking-widest uppercase pointer-events-none transition-opacity duration-700 ${
+          hintVisible ? 'opacity-60' : 'opacity-0'
         }`}
       >
         <ChevronDown className="w-3 h-3 animate-bounce" />

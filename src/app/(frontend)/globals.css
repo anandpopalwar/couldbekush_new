@@ -2,6 +2,81 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design tokens ─────────────────────────────────────────────────────────
+   The single source of truth for colour and type. Everything reads from here:
+   Tailwind's theme maps onto these (tailwind.config.ts), the raw CSS below
+   uses them, and RightSidebar reads them at runtime for its colour ramp.
+   Change a value here and it changes everywhere — never hardcode a colour,
+   size or family anywhere else.
+
+   Colours are stored as raw "R G B" channels, not hex, so Tailwind's opacity
+   modifiers keep working: `border-ink/10` compiles to
+   rgb(var(--color-ink) / 0.1). In plain CSS, wrap them: rgb(var(--color-ink)).
+*/
+:root {
+  /* Surfaces */
+  --color-canvas: 231 231 229;
+  --color-canvas-deep: 230 230 228;
+  --color-canvas-dark: 222 222 220;
+  --color-surface: 21 21 21; /* card back */
+
+  /* Text */
+  --color-ink: 17 17 17;
+  --color-ink-muted: 139 139 135;
+  --color-ink-subtle: 176 176 172;
+  --color-ink-plain: 156 163 175; /* list items away from centre */
+  --color-invert: 255 255 255;
+
+  /* Accents */
+  --color-accent-dot: 43 43 43;
+  --color-grain: 0 0 0;
+
+  /* Card deck. The centre card is this wide × CENTER_SCALE (CardDeck2.tsx);
+     every other card is a fraction of it. One value to resize the whole deck.
+     Phones get half the width, so the stacked layout's text block below the
+     deck has room. */
+  --card-width: 31vw;
+
+  /* Selected-work counter — the numeral rides Google Sans Flex's width axis */
+  --counter-size: 7rem;
+  --counter-width: 138; /* wdth, range 25–151 (100 = normal) */
+  --counter-opsz: 144; /* max optical size; what auto picks at this size anyway */
+}
+
+/* Card width steps up with the screen. Kept as overrides of the one token so
+   the deck is resized here rather than across four utility classes. */
+@media (min-width: 640px) {
+  :root {
+    --card-width: 270px;
+  }
+}
+@media (min-width: 768px) {
+  :root {
+    --card-width: 290px;
+    --counter-size: 9rem;
+  }
+}
+@media (min-width: 1024px) {
+  :root {
+    --card-width: 320px;
+    --counter-size: 11rem;
+  }
+}
+
+/* The page ground. Lives on both body and main — main needs its own copy so the
+   counter's mix-blend-difference has a real backdrop to invert against. */
+.page-canvas {
+  background-color: rgb(var(--color-canvas-deep));
+  background-image:
+    radial-gradient(
+      circle at 50% 50%,
+      rgb(var(--color-invert) / 0.45) 0%,
+      rgb(var(--color-canvas-deep) / 0.95) 75%
+    ),
+    radial-gradient(rgb(var(--color-grain) / 0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 16px 16px;
+}
+
 @layer base {
   * {
     -webkit-font-smoothing: antialiased;
@@ -9,19 +84,17 @@
     box-sizing: border-box;
   }
 
-  /* Default to Inter's text optical size; `.font-display` opts into opsz 32
-     ("Inter Display"), which the title tokens are drawn for. */
+  /* Google Sans Flex carries optical sizes from 6 to 144. Let the browser track
+     the axis against the rendered font-size rather than pinning one value —
+     small labels get the sturdier cut, the huge counter gets the display cut,
+     with nothing to keep in sync by hand. `.font-display` / `.font-text` below
+     override it where a specific cut is wanted. */
   html {
-    font-variation-settings: "opsz" 14;
+    font-optical-sizing: auto;
   }
 
   body {
-    background-color: #e6e6e4;
-    background-image: 
-      radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.45) 0%, rgba(230, 230, 228, 0.95) 75%),
-      radial-gradient(rgba(0,0,0,0.03) 1px, transparent 1px);
-    background-size: 100% 100%, 16px 16px;
-    color: #111111;
+    color: rgb(var(--color-ink));
     overflow: hidden;
     touch-action: none;
   }
@@ -31,14 +104,23 @@
    The scale itself lives in tailwind.config.ts as `text-title-*`,
    `text-label-*`, `text-paragraph-*`, `text-subheading-*` and `text-doc-*`;
    each token carries its own size, line height, tracking and weight.
-   These two classes switch Inter's optical size, which no `text-*` token can
-   set on its own. Titles want display; everything else wants text.          */
+   These two classes force Google Sans Flex's optical size, which no `text-*`
+   token can set. Only needed where automatic optical sizing picks the wrong
+   cut — a small heading that should still read as display, say.             */
 .font-display {
-  font-variation-settings: "opsz" 32;
+  font-variation-settings: "opsz" 48;
 }
 
 .font-text {
-  font-variation-settings: "opsz" 14;
+  font-variation-settings: "opsz" 18;
+}
+
+/* The selected-work numeral — extended width off the wdth axis. opsz is named
+   alongside it on purpose: font-variation-settings takes over the axes it lists
+   and can drop the browser's automatic optical sizing, which at this size would
+   leave the numeral set with a small-text cut. 144 is what auto picks here. */
+.counter-numeral {
+  font-variation-settings: "wdth" var(--counter-width), "opsz" var(--counter-opsz);
 }
 
 /* ── Right sidebar list ────────────────────────────────────────────────────
@@ -48,20 +130,23 @@
    arrives, instead of switching the moment the selection changes — the list
    is still gliding for 0.38s after that. Colour and opacity are set inline by
    the same pass. At rest these resolve to the plain/selected values exactly. */
+/* Each rule interpolates from a plain value at --u 0 to the selected value at
+   --u 1. The selected end is the spec, and each one lands on a scale token:
+   rs-sub = subheading-xs (12/16, 4%), rs-title = title-h5 (24/32, 0),
+   rs-desc = paragraph-sm (14/20, -0.6%). They're written as calc() rather than
+   applied as token classes because the size has to move with the glide. */
 .rs-sub {
-  font-size: calc(9px + 1.5px * var(--u, 0));
-  letter-spacing: calc(0.1em * var(--u, 0));
+  font-size: calc(9px + 3px * var(--u, 0));
+  line-height: calc(12px + 4px * var(--u, 0));
+  letter-spacing: calc(0.04em * var(--u, 0));
+  font-weight: 500;
 }
 
 .rs-title {
-  font-size: calc(14px + 5px * var(--u, 0));
-  letter-spacing: calc(-0.025em * var(--u, 0));
-}
-
-@media (min-width: 768px) {
-  .rs-title {
-    font-size: calc(14px + 7px * var(--u, 0));
-  }
+  font-size: calc(14px + 10px * var(--u, 0));
+  line-height: calc(20px + 12px * var(--u, 0));
+  letter-spacing: 0;
+  font-weight: 500;
 }
 
 .rs-dash {
@@ -69,7 +154,10 @@
 }
 
 .rs-desc {
-  font-size: calc(10px + 2px * var(--u, 0));
+  font-size: calc(10px + 4px * var(--u, 0));
+  line-height: calc(14px + 6px * var(--u, 0));
+  letter-spacing: calc(-0.006em * var(--u, 0));
+  font-weight: 400;
 }
 
 /* Hide standard scrollbars */

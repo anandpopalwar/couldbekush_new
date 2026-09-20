@@ -11,32 +11,31 @@ interface TopHeaderProps {
 export function TopHeader({ audioEnabled, onToggleAudio }: TopHeaderProps) {
   return (
     <>
-      {/* Far-left vertical rotated brand mark */}
-      <div className="fixed top-8 left-4 z-40 hidden xl:flex flex-col items-start origin-top-left -rotate-90 pointer-events-auto select-none whitespace-nowrap">
+      {/* Far-left vertical brand mark, reading bottom-to-top.
+          -rotate-90 turns the strip counter-clockwise, so its length runs UP
+          from the transform origin and its thickness runs RIGHT. It therefore
+          has to be anchored at the BOTTOM-left: with origin-top-left and top-8
+          it rotated up out of the viewport and was clipped entirely. */}
+      {/* <div className="fixed bottom-8 left-4 z-40 hidden xl:flex flex-col items-start origin-bottom-left -rotate-90 pointer-events-auto select-none whitespace-nowrap">
         <div className="flex items-baseline gap-x-4">
-          <span className="font-extrabold text-ink text-[20px] leading-none tracking-tight">
-            HUYVU®
+          <span className="font-extrabold text-ink text-title-h6 leading-none tracking-tight">
+            couldbekush®
           </span>
-          <span className="font-mono text-[9px] tracking-widest text-inkMuted uppercase">
+          <span className="font-mono text-micro-sm tracking-widest text-inkMuted uppercase">
             copyright 2026
           </span>
-          <span className="font-mono text-[9px] tracking-widest text-inkMuted uppercase">
-            hcmc, vn
-          </span>
-          <span className="font-mono text-[9px] tracking-widest text-ink font-bold uppercase">
-            +84
-          </span>
+ 
         </div>
-      </div>
+      </div> */}
 
       {/* Top header row — Menu + nav live in the left sidebar and occupy the left zone.
           The header itself is click-through except for its interactive controls. */}
-      <header className="fixed top-0 left-0 right-0 z-40 px-6 md:px-9 py-6 flex justify-between items-start pointer-events-none text-ink">
+      <header className="fixed top-0 left-0 right-0 z-40 px-6 compact:px-9 py-6 flex justify-between items-start pointer-events-none text-ink">
         {/* Left spacer (keeps Audio/Working centered via justify-between) */}
         <div aria-hidden className="w-px" />
 
         {/* Center: Audio status + location */}
-        <div className="hidden lg:flex items-start gap-x-16 font-mono text-[10px] tracking-wider uppercase text-ink">
+        <div className="hidden compact:flex items-start gap-x-16 font-mono text-micro-md tracking-wider uppercase text-ink">
           <button
             onClick={onToggleAudio}
             className="flex items-center gap-x-2 hover:opacity-70 transition-opacity pointer-events-auto"
@@ -46,21 +45,21 @@ export function TopHeader({ audioEnabled, onToggleAudio }: TopHeaderProps) {
           </button>
 
           <div className="flex flex-col leading-tight pointer-events-auto">
-            <span className="font-bold text-ink normal-case text-[11px] tracking-normal">
+            <span className="font-bold text-ink normal-case text-micro-lg tracking-normal">
               Working globally
             </span>
-            <span className="text-inkMuted">HCMC, 00:57</span>
+            {/* <span className="text-inkMuted">Ahmedabad, 11:10 PM IST</span> */}
           </div>
         </div>
 
         {/* Right: contact inquiries */}
-        <div className="font-mono text-[10px] tracking-wider uppercase text-ink pointer-events-auto">
+        <div className="font-mono text-micro-md tracking-wider  text-ink pointer-events-auto">
           <span className="text-inkMuted hidden sm:inline mr-2 normal-case">For inquiries</span>
           <a
-            href="mailto:hello@huyvu.design"
+            href="mailto:couldbekush@gmail.com"
             className="font-bold underline hover:opacity-75 transition-opacity"
           >
-            hello@huyvu.design
+            couldbekush@gmail.com
           </a>
         </div>
       </header>

@@ -1,10 +1,17 @@
-# Project Knowledge: HUYVU® Portfolio
+# Project Knowledge: couldbekush Portfolio
 
 ## Overview
-A high-end creative portfolio website for HUYVU® — an independent design direction practice. Features a 3D card deck interface with fluid interactions, kinetic typography, and premium aesthetics.
+The portfolio of **couldbekush**, an independent designer working globally.
+Selected work is presented as a vertical card deck the visitor scrolls through,
+with the project's details either side of it on desktop or stacked beneath it on
+phones. Content comes from Payload CMS.
+
+(The design started from the HUYVU/huyml.co reference site; a few notes below
+still cite it as the source of a layout decision.)
 
 ## Tech Stack
-- **Framework**: Next.js 15 (App Router)
+- **Framework**: Next.js 16 (App Router)
+- **CMS**: Payload 3 (MongoDB), media on Vercel Blob
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS 3.4
 - **Animations**: GSAP 3.12
@@ -138,16 +145,51 @@ Invisible Arc (bottom half): Top cards → Bottom cards (instant, opacity 0)
 
 ## Design System
 
-### Colors (Tailwind)
-- `canvas`: #e7e7e5 (background)
-- `ink`: #111111 (primary text)
-- `inkMuted`: #8b8b87 (secondary text)
-- `inkSubtle`: #b0b0ac (tertiary text)
+**Everything is tokenized. Never write a literal colour, size or family in a
+component** — no `#hex`, no `rgb()`, no `text-[13px]`, no font name. Add the
+token first, then use it. A value should be changeable in one place and land
+across the whole project.
+
+### Tokens
+The source of truth is `:root` in `src/app/(frontend)/globals.css`.
+
+- **Colours** are stored as raw `R G B` channels, not hex, so Tailwind's
+  `<alpha-value>` keeps opacity modifiers working — `border-ink/10` compiles to
+  `rgb(var(--color-ink) / 0.1)`. `tailwind.config.ts` maps every theme colour
+  onto `rgb(var(--color-…) / <alpha-value>)`.
+  - Surfaces: `canvas`, `canvasDeep`, `canvasDark`, `surface` (card back)
+  - Text: `ink`, `inkMuted`, `inkSubtle`, `inkPlain` (list items off centre),
+    `invert`
+  - Accents: `accentDot`, `--color-grain`
+- **In raw CSS**, wrap them: `rgb(var(--color-ink))`.
+- **In JS**, read them rather than redeclaring — see `ramp()` in
+  RightSidebar.tsx, which resolves `--color-ink` / `--color-ink-plain` with
+  `getComputedStyle` for its colour interpolation.
+- **`.page-canvas`** carries the page ground and is applied to both `body` and
+  `main` (main needs its own copy for the counter's blend mode).
+- **Text sizes are tokenized.** No `text-[Npx]` literals remain in components.
+  Alongside the AlignUI scale there is a **micro** group — `text-micro-lg`
+  (11px), `-md` (10), `-sm` (9), `-xs` (8) — for the chrome that sits below the
+  sheet's smallest step: mono labels, the scroll hint, header meta. Those
+  tokens carry weight 400 and no tracking deliberately, so the `font-bold` and
+  `tracking-*` classes already on those elements still win.
+- The scale's tracking values were measured for Inter and have not been
+  re-checked against Google Sans Flex.
 
 ### Typography
-- Sans: Inter (variable font, `opsz` axis enabled)
-- Mono: JetBrains Mono (variable font)
-- `.font-display` = Inter Display (opsz 32) for titles; `.font-text` = opsz 14 (the default)
+**One typeface: Google Sans Flex.** Variable on six axes (`wght` 1–1000,
+`opsz` 6–144, `wdth` 25–151, `GRAD`, `ROND`, `slnt`); `opsz` is requested
+explicitly in `layout.tsx` because Google Fonts otherwise serves a weight-only
+instance.
+
+- `font-sans` and `font-mono` both resolve to it. `mono` is kept only because
+  ~26 places still say `font-mono` for small tracked labels.
+- `html` sets `font-optical-sizing: auto`, so the optical size tracks the
+  rendered font-size. Do **not** pin `font-variation-settings: "opsz" N`
+  globally — the axis range is 6–144 here, so a fixed value silently forces the
+  wrong cut on everything.
+- `.font-display` (opsz 48) / `.font-text` (opsz 18) override it where automatic
+  sizing picks the wrong cut.
 
 Scale from the AlignUI "Typography [Overview]" sheet, defined as Tailwind
 `fontSize` tokens — each token already carries size, line height, tracking and
@@ -164,6 +206,27 @@ weight, so one `text-*` class is the whole style.
 | `text-doc-label` / `text-doc-paragraph` | 18/32 | -1.5% | 500 / 400 |
 
 - Titles pair with `font-display`; subheadings are drawn for `uppercase`.
+
+### Layout breakpoints
+Named screens in `tailwind.config.ts`, matching the reference site's page
+variants. Added **alongside** Tailwind's defaults, which still work.
+
+| Prefix | Range | Notes |
+|--------|-------|-------|
+| (none) | 0–1099 | mobile / small |
+| `compact:` | 1100–1199 | |
+| `desktop:` | 1200–1439 | |
+| `wide:` | 1440–2399 | the primary design target |
+| `ultra:` | 2400+ | |
+
+They live in the config, not as CSS tokens, because a media query cannot read a
+custom property. Note the sidebars still use `hidden md:flex` (768px), so they
+appear well before the reference's mobile variant ends at 1099 — switch those to
+`compact:` / `wide:` if matching that layout exactly matters.
+
+Typography breakpoints on the reference use different boundaries again
+(display 23/29/40/60px stepping at 1200/1440/1920; body at 1100/1800). Not
+adopted — recorded here in case it comes up.
 
 ### Interactions
 Wheel constants live at the top of `PortfolioClient.tsx`.

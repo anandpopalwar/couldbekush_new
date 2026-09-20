@@ -18,7 +18,8 @@ export const Posts: CollectionConfig = {
   versions: {
     maxPerDoc: 25,
     drafts: {
-      autosave: { interval: 375 },
+      // See Projects.ts — 800ms is Payload's documented minimum.
+      autosave: { interval: 800 },
       schedulePublish: true,
     },
   },

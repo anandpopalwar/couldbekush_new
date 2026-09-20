@@ -336,7 +336,7 @@ export function CardDeck({
                 }}
                 className={`absolute inset-0 w-full h-full rounded-sm ${
                   isTopFirst ? "card-flap-shadow" : "card-deck-shadow"
-                } overflow-hidden bg-[#151515] transition-shadow duration-500 will-change-transform select-none cursor-pointer group`}
+                } overflow-hidden bg-surface transition-shadow duration-500 will-change-transform select-none cursor-pointer group`}
                 data-index={idx}
               >
                 <div className="relative w-full h-full overflow-hidden">
@@ -368,7 +368,7 @@ export function CardDeck({
 
       {/* Floating drag hint overlay */}
       <div
-        className={`absolute bottom-6 flex items-center space-x-2 text-inkMuted text-[10px] font-mono tracking-widest uppercase pointer-events-none transition-opacity duration-700 ${
+        className={`absolute bottom-6 flex items-center space-x-2 text-inkMuted text-micro-md font-mono tracking-widest uppercase pointer-events-none transition-opacity duration-700 ${
           hintVisible ? "opacity-60" : "opacity-0"
         }`}
       >

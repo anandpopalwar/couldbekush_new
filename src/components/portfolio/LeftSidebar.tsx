@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import gsap from 'gsap';
 import { Project, NavSection } from '@/types/portfolio';
+import { useTransitionBlur } from '@/hooks/useTransitionBlur';
 
 interface LeftSidebarProps {
   activeProject: Project;
@@ -19,57 +18,9 @@ export function LeftSidebar({
   activeSection,
   onSelectSection,
 }: LeftSidebarProps) {
-  const metaContainerRef = useRef<HTMLDivElement>(null);
-  const counterRef = useRef<HTMLSpanElement>(null);
-  const prevProjectRef = useRef<string>(activeProject.id);
-  const blurRef = useRef({ v: 0 });
-  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // While the deck is transitioning between projects, blur the sidebar content; once scrolling
-  // settles (debounced) sharpen it back. Replaces the old vertical "bounce" animation.
-  useEffect(() => {
-    if (prevProjectRef.current === activeProject.id) return;
-    prevProjectRef.current = activeProject.id;
-
-    const applyBlur = () => {
-      const px = `blur(${blurRef.current.v}px)`;
-      if (metaContainerRef.current) metaContainerRef.current.style.filter = px;
-      // Blur the counter number too while transitioning. The filter is cleared at rest
-      // (onComplete) so its mix-blend-difference stays clean once settled.
-      if (counterRef.current) counterRef.current.style.filter = px;
-    };
-
-    // Ramp the blur up quickly as the card starts moving.
-    gsap.to(blurRef.current, {
-      v: 6,
-      duration: 0.15,
-      ease: 'power1.out',
-      overwrite: true,
-      onUpdate: applyBlur,
-    });
-
-    // Sharpen only once scrolling has settled, so rapid scrolling stays blurred throughout.
-    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-    settleTimerRef.current = setTimeout(() => {
-      gsap.to(blurRef.current, {
-        v: 0,
-        duration: 0.45,
-        ease: 'power2.out',
-        overwrite: true,
-        onUpdate: applyBlur,
-        onComplete: () => {
-          if (metaContainerRef.current) metaContainerRef.current.style.filter = '';
-          if (counterRef.current) counterRef.current.style.filter = '';
-        },
-      });
-    }, 170);
-  }, [activeProject]);
-
-  useEffect(() => {
-    return () => {
-      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-    };
-  }, []);
+  // Blurred while the deck moves between projects, sharp once it settles.
+  // Shared with the mobile stack — see useTransitionBlur.
+  const blurRef = useTransitionBlur(activeProject.id);
 
   const navItems: { id: NavSection; label: string }[] = [
     { id: 'work', label: 'WORK' },
@@ -79,14 +30,15 @@ export function LeftSidebar({
   ];
 
   return (
-    <aside className="hidden md:flex md:col-start-1 md:col-span-3 md:row-start-1 h-full flex-col pointer-events-none text-ink relative">
+    <aside className="hidden compact:flex compact:col-start-1 compact:col-span-3 compact:row-start-1 h-full flex-col pointer-events-none text-ink relative">
       {/* Primary Section Nav Links — indented to the main column (aligns with Launch),
           raised to sit at the top header row like the reference. */}
-      <div className="pt-6 pr-6 pl-[50%] pointer-events-auto">
-        <span className="block text-[10px] font-mono tracking-widest text-inkMuted uppercase mb-8">
+      <div className="p-6 pointer-events-auto">
+        <span className="block text-micro-md font-mono tracking-widest text-inkMuted uppercase mb-4">
           Menu
         </span>
-        <nav className="group space-y-0 uppercase font-extrabold tracking-tight text-[20px] md:text-[24px] leading-[1.1]">
+        {/* 24/32, no tracking, weight 500 — exactly the title-h5 token. */}
+        <nav className="group space-y-0 uppercase text-title-h5">
           {navItems.map((item) => {
             const isActive = activeSection === item.id;
             return (
@@ -94,9 +46,7 @@ export function LeftSidebar({
                 <button
                   onClick={() => onSelectSection(item.id)}
                   className={`inline-flex items-center transition-all duration-200 group-hover:blur-[3px] hover:!blur-none ${
-                    isActive
-                      ? 'text-ink font-bold'
-                      : 'font-bold hover:text-ink'
+                    isActive ? 'text-ink' : 'hover:text-ink'
                   }`}
                 >
                   {isActive && <span className="mr-1.5 text-ink">→</span>}
@@ -111,35 +61,31 @@ export function LeftSidebar({
       {/* Dynamic Project Metadata — anchored at a FIXED vertical position so the Role/Launch
           labels never shift with content length; Recognition simply grows downward. */}
       <div
-        ref={metaContainerRef}
+        ref={blurRef}
         className="absolute top-[43%] left-5 right-6 grid grid-cols-2 gap-x-6 items-start"
       >
         {/* Left column: Role */}
         <div className="grid grid-cols-[5rem_1fr] gap-6 items-start content-start">
-          <span className="text-[12px] tracking-wide text-inkMuted">
+          <span className="text-label-xs text-inkMuted">
             Role
           </span>
-          <p className="text-[12px] font-bold text-ink leading-snug">
-            {activeProject.role}
-          </p>
+          <p className="text-label-xs text-ink">{activeProject.role}</p>
         </div>
 
         {/* Right column: Launch, then Recognition */}
         <div className="space-y-8">
           <div className="grid grid-cols-[5rem_1fr] gap-6 items-start">
-            <span className="text-[12px] tracking-wide text-inkMuted">
+            <span className="text-label-xs text-inkMuted">
               Launch
             </span>
-            <p className="text-[12px] font-bold text-ink">
-              {activeProject.launch}
-            </p>
+            <p className="text-label-xs text-ink">{activeProject.launch}</p>
           </div>
 
           <div className="grid grid-cols-[5rem_1fr] gap-6 items-start">
-            <span className="text-[12px] tracking-wide text-inkMuted">
+            <span className="text-label-xs text-inkMuted">
               Recognition
             </span>
-            <ul className="text-ink text-[12px] font-bold leading-snug whitespace-nowrap">
+            <ul className="text-label-xs text-ink whitespace-nowrap">
               {activeProject.recognition.map((rec, idx) => (
                 <li key={idx}>{rec}</li>
               ))}
@@ -160,19 +106,19 @@ export function LeftSidebar({
       <div className="absolute bottom-2 left-0 w-screen flex justify-center pointer-events-none">
         <div className="flex items-start gap-x-4">
           <span
-            ref={counterRef}
-            className="text-[8rem] md:text-[10rem] lg:text-[12rem] font-medium tracking-tight text-white mix-blend-difference inline-block leading-none tabular-nums"
+            ref={blurRef}
+            className="counter-numeral text-[length:var(--counter-size)] font-medium tracking-tight text-invert mix-blend-difference inline-block leading-none tabular-nums"
           >
             {activeProject.id}
           </span>
-          <span className="text-[13px] font-semibold text-inkMuted mt-2">
+          <span className="text-label-sm font-semibold text-inkMuted mt-2">
             /{String(totalCount).padStart(2, '0')}
           </span>
         </div>
       </div>
 
       {/* Scroll hint — bottom, inset from the left edge to match the right-side padding */}
-      <div className="absolute bottom-6 left-5 text-[10px] tracking-wide text-inkMuted">
+      <div className="absolute bottom-6 left-5 text-micro-md tracking-wide text-inkMuted">
         Scroll
       </div>
     </aside>

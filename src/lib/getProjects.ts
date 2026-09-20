@@ -33,21 +33,39 @@ const toPortfolioProject = (p: PayloadProject, index: number): Project => {
   };
 };
 
-/** Published projects from Payload, oldest first. Falls back to the static list while the CMS is empty. */
+/**
+ * Published projects from Payload, oldest first.
+ *
+ * Falls back to the static list twice over: when the CMS has nothing published,
+ * and when the CMS cannot be reached at all. The second case is what a build
+ * hits with no PAYLOAD_SECRET or DATABASE_URI — getPayload throws, and because
+ * this page is prerendered that used to take the whole build down. A portfolio
+ * whose content is missing should still render; it should not fail to deploy.
+ *
+ * The warning matters: a production deploy that logs it is serving placeholder
+ * projects, which looks like a working site rather than a broken one.
+ */
 export async function getProjects(): Promise<Project[]> {
-  const payload = await getPayload({ config });
-  const { docs } = await payload.find({
-    collection: "projects",
-    where: { _status: { equals: "published" } },
-    sort: "createdAt",
-    depth: 1,
-    limit: 100,
-    overrideAccess: false,
-  });
+  try {
+    const payload = await getPayload({ config });
+    const { docs } = await payload.find({
+      collection: "projects",
+      where: { _status: { equals: "published" } },
+      sort: "createdAt",
+      depth: 1,
+      limit: 100,
+      overrideAccess: false,
+    });
 
-  const projects = docs
-    .map(toPortfolioProject)
-    .filter((p) => p.image);
+    const projects = docs.map(toPortfolioProject).filter((p) => p.image);
 
-  return projects.length > 0 ? projects : PROJECTS;
+    return projects.length > 0 ? projects : PROJECTS;
+  } catch (error) {
+    console.warn(
+      "[getProjects] Payload unavailable — serving the static project list. " +
+        "Check DATABASE_URI and PAYLOAD_SECRET are set in this environment.",
+      error instanceof Error ? error.message : error,
+    );
+    return PROJECTS;
+  }
 }

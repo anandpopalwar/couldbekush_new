@@ -88,7 +88,7 @@ export const PROJECTS: Project[] = [
     client: "District2 Collective",
     techStack: ["Vue", "GSAP", "Canvas API"],
     liveUrl: "https://district2.example.com",
-    overview: "District2 Studio represented the origin of HUYVU's design journey. The website celebrates bold structural grid shifts, monochromatic photography, and experimental layout interactions.",
+    overview: "District2 Studio represented the origin of couldbekush's design journey. The website celebrates bold structural grid shifts, monochromatic photography, and experimental layout interactions.",
     recognition: [
       "Awwwards Site of the Day",
       "CSSDA Website of the Day",

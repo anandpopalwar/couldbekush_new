@@ -25,6 +25,57 @@ const ITEM_HEIGHT = 150;
 // runaway multi-card "sweep" is structurally impossible.
 const SLOT_RADIUS = 8;
 
+// A slot's appearance is a function of how far it actually is from the centre of
+// the viewport, not of which slot happens to hold the selected project. The
+// slots are relabeled the instant the selection changes but the track takes
+// 0.38s to glide, so a boolean would make the incoming card fully selected while
+// it is still a whole slot away. Both formulas below collapse to exactly the old
+// values at rest (distance 0, 1, 2 …) and only differ while the track moves.
+const SLOT_FALLOFF = 0.52;
+const MIN_FADE = 0.1;
+// How late the emphasis arrives. 1 ramps linearly across the slot; higher keeps
+// the card plain until it is nearly centred, then commits quickly.
+const CENTER_RAMP = 2.2;
+
+// Read straight from the design tokens so the ramp can't drift from the rest of
+// the palette. Resolved once on first use — the tokens are static.
+let rampCache: { plain: number[]; ink: number[] } | null = null;
+
+function readChannels(token: string, fallback: number[]) {
+  if (typeof window === "undefined") return fallback;
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue(token)
+    .trim();
+  const channels = raw.split(/[\s,]+/).map(Number).filter((n) => !Number.isNaN(n));
+  return channels.length === 3 ? channels : fallback;
+}
+
+function ramp() {
+  if (!rampCache) {
+    rampCache = {
+      plain: readChannels("--color-ink-plain", [156, 163, 175]),
+      ink: readChannels("--color-ink", [17, 17, 17]),
+    };
+  }
+  return rampCache;
+}
+
+function slotFade(distance: number) {
+  return Math.max(MIN_FADE, Math.pow(SLOT_FALLOFF, distance));
+}
+
+/** 1 when a slot is dead centre, 0 once it is a full slot away. */
+function slotEmphasis(distance: number) {
+  return Math.pow(Math.max(0, 1 - distance), CENTER_RAMP);
+}
+
+function slotColor(emphasis: number) {
+  const { plain, ink } = ramp();
+  const channel = (i: number) =>
+    Math.round(plain[i] + (ink[i] - plain[i]) * emphasis);
+  return `rgb(${channel(0)}, ${channel(1)}, ${channel(2)})`;
+}
+
 // useLayoutEffect on the client (positions the track before paint so relabels
 // are never visible), falling back to useEffect during SSR to avoid warnings.
 const useIsomorphicLayoutEffect =
@@ -37,11 +88,42 @@ export function RightSidebar({
 }: RightSidebarProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const slotsRef = useRef<(HTMLDivElement | null)[]>([]);
+  const paintedRef = useRef<number[]>([]);
   const prevIndexRef = useRef(currentIndex);
   const mountedRef = useRef(false);
   const totalCount = projects.length;
 
   const slotCount = SLOT_RADIUS * 2 + 1;
+
+  // Re-derive every slot's emphasis from where the track actually is. Called on
+  // each frame of the glide, so emphasis follows the motion instead of leading
+  // it. Slots whose distance hasn't meaningfully changed are left alone.
+  const paint = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) return;
+
+    const vpH =
+      viewportRef.current?.clientHeight ||
+      (typeof window !== "undefined" ? window.innerHeight : 0);
+    const trackY = (gsap.getProperty(track, "y") as number) ?? 0;
+    const viewportCenter = vpH / 2;
+
+    slotsRef.current.forEach((el, j) => {
+      if (!el) return;
+      const slotCenter = trackY + j * ITEM_HEIGHT + ITEM_HEIGHT / 2;
+      const distance = Math.abs(slotCenter - viewportCenter) / ITEM_HEIGHT;
+
+      const cacheKey = Math.round(distance * 500);
+      if (paintedRef.current[j] === cacheKey) return;
+      paintedRef.current[j] = cacheKey;
+
+      const emphasis = slotEmphasis(distance);
+      el.style.opacity = slotFade(distance).toFixed(3);
+      el.style.color = slotColor(emphasis);
+      el.style.setProperty("--u", emphasis.toFixed(3));
+    });
+  }, []);
 
   // Track Y that parks the center slot at the vertical center of the viewport.
   const restY = useCallback(() => {
@@ -63,6 +145,7 @@ export function RightSidebar({
       mountedRef.current = true;
       prevIndexRef.current = currentIndex;
       gsap.set(track, { y: restY() });
+      paint();
       return;
     }
 
@@ -78,23 +161,30 @@ export function RightSidebar({
     // The relabel shifted every slot's project by `dir`; shift the track by the
     // same amount so the picture is unchanged, then animate back to rest.
     gsap.set(track, { y: currentY - dir * ITEM_HEIGHT });
+    // Repaint against the compensated position, so the first frame after a step
+    // still emphasises whichever card is genuinely at the centre — the one that
+    // is about to leave — rather than the one that hasn't arrived yet.
+    paint();
     gsap.to(track, {
       y: base,
       duration: 0.38,
       ease: "power2.out",
       overwrite: true,
+      onUpdate: paint,
+      onComplete: paint,
     });
-  }, [currentIndex, totalCount, restY]);
+  }, [currentIndex, totalCount, restY, paint]);
 
   // Resize: re-park instantly.
   useEffect(() => {
     const handleResize = () => {
       const track = trackRef.current;
       if (track) gsap.set(track, { y: restY() });
+      paint();
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [restY]);
+  }, [restY, paint]);
 
   // No local wheel handler: wheel events over the sidebar bubble up to the global
   // page scroll handler, which advances the deck (and the sidebar follows in sync).
@@ -102,7 +192,7 @@ export function RightSidebar({
   const themeColors = projects[currentIndex]?.themeColors;
 
   return (
-    <aside className="hidden md:flex md:col-start-10 md:col-span-3 md:row-start-1 h-full flex-col justify-between pointer-events-auto pl-0 pr-30 overflow-hidden relative">
+    <aside className="hidden compact:flex compact:col-start-10 compact:col-span-3 compact:row-start-1 h-full flex-col justify-between pointer-events-auto pl-0 pr-30 overflow-hidden relative">
       <div
         ref={viewportRef}
         className="w-full h-full relative overflow-hidden touch-none"
@@ -117,59 +207,39 @@ export function RightSidebar({
             const project = projects[pIdx];
             const isCenter = s === 0;
 
-            // Fade is fixed per slot (never changes), so relabels/recentering
-            // can never cause an opacity flash.
-            const fade = isCenter
-              ? 1
-              : Math.max(0.1, Math.pow(0.52, Math.abs(s)));
+            // Rest-state appearance, for the first paint and for SSR. paint()
+            // takes over as soon as the track moves; the two agree exactly here.
+            const distance = Math.abs(s);
+            const emphasis = slotEmphasis(distance);
 
             return (
               <div
                 key={j}
+                ref={(el) => {
+                  slotsRef.current[j] = el;
+                }}
                 onClick={() => {
                   if (isCenter) return;
                   onGoToIndex(pIdx, s < 0 ? "down" : "up");
                 }}
-                style={{ opacity: fade }}
-                className="h-[150px] relative flex flex-col items-center justify-center text-center cursor-pointer select-none px-0 pr-28 "
+                style={
+                  {
+                    opacity: slotFade(distance),
+                    color: slotColor(emphasis),
+                    "--u": emphasis,
+                  } as React.CSSProperties
+                }
+                className="rs-slot h-[150px] relative flex flex-col items-center justify-center text-center cursor-pointer select-none px-0 pr-28 "
               >
-                <span
-                  className={`uppercase mb-1 ${
-                    isCenter
-                      ? "text-ink font-normal text-[10.5px] tracking-widest"
-                      : "text-gray-400 font-normal text-[9px] tracking-normal"
-                  }`}
-                >
+                <span className="rs-sub font-code uppercase mb-1">
                   {project.subtitle}
                 </span>
 
-                <h4
-                  className={`uppercase ${
-                    isCenter
-                      ? "text-ink font-normal text-[19px] md:text-[21px] tracking-tight"
-                      : "text-gray-400 font-normal text-[14px] tracking-normal"
-                  }`}
-                >
-                  {project.title}
-                </h4>
+                <h4 className="rs-title uppercase">{project.title}</h4>
 
-                <span
-                  className={`${
-                    isCenter
-                      ? "text-ink font-normal text-sm my-1"
-                      : "text-gray-400 font-normal text-[10px] my-0.5"
-                  }`}
-                >
-                  —
-                </span>
+                <span className="rs-dash my-1">—</span>
 
-                <p
-                  className={`max-w-[280px] line-clamp-3 ${
-                    isCenter
-                      ? "text-ink font-normal text-[12px] leading-snug"
-                      : "text-gray-400 font-normal text-[10px]"
-                  }`}
-                >
+                <p className="rs-desc max-w-[280px] line-clamp-3">
                   {project.description}
                 </p>
               </div>
@@ -192,10 +262,10 @@ export function RightSidebar({
         </div>
       )}
 
-      <div className="absolute bottom-6 right-6 z-30 font-mono text-[10px] font-bold text-ink uppercase tracking-wider flex items-center space-x-1 hover:opacity-75 transition-opacity cursor-pointer">
+      {/* <div className="absolute bottom-6 right-6 z-30 font-mono text-micro-md font-bold text-ink uppercase tracking-wider flex items-center space-x-1 hover:opacity-75 transition-opacity cursor-pointer">
         <span className="underline font-black">'25 showreel</span>
-        <span className="text-[8px]">▶</span>
-      </div>
+        <span className="text-micro-xs">▶</span>
+      </div> */}
     </aside>
   );
 }

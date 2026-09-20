@@ -20,7 +20,10 @@ export const Projects: CollectionConfig = {
   versions: {
     maxPerDoc: 25,
     drafts: {
-      autosave: { interval: 375 },
+      // 800ms is Payload's documented minimum and its default. Below that the
+      // admin fires a save on roughly every keystroke and the requests overlap,
+      // which surfaces as intermittent "problem saving" while typing.
+      autosave: { interval: 800 },
       schedulePublish: true,
     },
   },

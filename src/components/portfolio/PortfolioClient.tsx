@@ -262,8 +262,6 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
 
         <LeftSidebar
           activeProject={activeProject}
-          currentIndex={currentIndex}
-          totalCount={totalCount}
           activeSection={activeSection}
           onSelectSection={(section) => {
             setActiveSection(section);

@@ -5,16 +5,12 @@ import { useTransitionBlur } from '@/hooks/useTransitionBlur';
 
 interface LeftSidebarProps {
   activeProject: Project;
-  currentIndex: number;
-  totalCount: number;
   activeSection: NavSection;
   onSelectSection: (section: NavSection) => void;
 }
 
 export function LeftSidebar({
   activeProject,
-  currentIndex,
-  totalCount,
   activeSection,
   onSelectSection,
 }: LeftSidebarProps) {
@@ -62,35 +58,33 @@ export function LeftSidebar({
           labels never shift with content length; Recognition simply grows downward. */}
       <div
         ref={blurRef}
-        className="absolute top-[43%] left-5 right-6 grid grid-cols-2 gap-x-6 items-start"
+        className="absolute top-[43%] left-5 right-6 grid grid-cols-2 gap-x-8 items-start"
       >
-        {/* Left column: Role */}
-        <div className="grid grid-cols-[5rem_1fr] gap-6 items-start content-start">
-          <span className="text-label-xs text-inkMuted">
-            Role
-          </span>
-          <p className="text-label-xs text-ink">{activeProject.role}</p>
+        {/* Label columns are `auto`, not a fixed 5rem: a fixed track left a
+            short label like "Role" stranded far from its value. Launch and
+            Recognition share one grid so `auto` resolves to the same width for
+            both and their values still line up.
+
+            min-w-0 on the columns matters — a grid item defaults to
+            min-width:auto, so a long word (Architecture) overflowed its track
+            and ran into the gap, which is why Role's value touched "Launch". */}
+        <div className="grid grid-cols-[auto_1fr] gap-x-3 items-start content-start min-w-0">
+          <span className="text-label-xs text-inkMuted">Role</span>
+          <p className="text-label-xs text-ink min-w-0">{activeProject.role}</p>
         </div>
 
-        {/* Right column: Launch, then Recognition */}
-        <div className="space-y-8">
-          <div className="grid grid-cols-[5rem_1fr] gap-6 items-start">
-            <span className="text-label-xs text-inkMuted">
-              Launch
-            </span>
-            <p className="text-label-xs text-ink">{activeProject.launch}</p>
-          </div>
+        <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-8 items-start content-start min-w-0">
+          <span className="text-label-xs text-inkMuted">Launch</span>
+          <p className="text-label-xs text-ink min-w-0">
+            {activeProject.launch}
+          </p>
 
-          <div className="grid grid-cols-[5rem_1fr] gap-6 items-start">
-            <span className="text-label-xs text-inkMuted">
-              Recognition
-            </span>
-            <ul className="text-label-xs text-ink whitespace-nowrap">
-              {activeProject.recognition.map((rec, idx) => (
-                <li key={idx}>{rec}</li>
-              ))}
-            </ul>
-          </div>
+          <span className="text-label-xs text-inkMuted">Recognition</span>
+          <ul className="text-label-xs text-ink whitespace-nowrap">
+            {activeProject.recognition.map((rec, idx) => (
+              <li key={idx}>{rec}</li>
+            ))}
+          </ul>
         </div>
       </div>
 
@@ -104,17 +98,12 @@ export function LeftSidebar({
           blend against that instead of against main's background and the cards, which
           renders it solid white. */}
       <div className="absolute bottom-2 left-0 w-screen flex justify-center pointer-events-none">
-        <div className="flex items-start gap-x-4">
-          <span
-            ref={blurRef}
-            className="counter-numeral text-[length:var(--counter-size)] font-medium tracking-tight text-invert mix-blend-difference inline-block leading-none tabular-nums"
-          >
-            {activeProject.id}
-          </span>
-          <span className="text-label-sm font-semibold text-inkMuted mt-2">
-            /{String(totalCount).padStart(2, '0')}
-          </span>
-        </div>
+        <span
+          ref={blurRef}
+          className="counter-numeral text-[length:var(--counter-size)] font-medium tracking-tight text-invert mix-blend-difference inline-block leading-none tabular-nums"
+        >
+          {activeProject.id}
+        </span>
       </div>
 
       {/* Scroll hint — bottom, inset from the left edge to match the right-side padding */}

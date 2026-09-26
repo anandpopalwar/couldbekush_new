@@ -100,7 +100,7 @@ export function LeftSidebar({
       <div className="absolute bottom-2 left-0 w-screen flex justify-center pointer-events-none">
         <span
           ref={blurRef}
-          className="counter-numeral text-[length:var(--counter-size)] font-medium tracking-tight text-invert mix-blend-difference inline-block leading-none tabular-nums"
+          className="counter-numeral text-[length:var(--counter-size)] tracking-tight text-invert mix-blend-difference inline-block leading-none tabular-nums"
         >
           {activeProject.id}
         </span>

@@ -1,5 +1,6 @@
 'use client';
 
+import { Send } from 'lucide-react';
 import { NavSection } from '@/types/portfolio';
 
 interface TopHeaderProps {
@@ -38,14 +39,23 @@ export function TopHeader({ audioEnabled, onToggleAudio }: TopHeaderProps) {
       <header className="fixed top-0 left-0 right-0 z-40 px-6 compact:px-9 py-6 flex justify-end pointer-events-none text-ink">
         <div className="flex flex-col items-end gap-y-1.5">
                 <div className="font-mono text-micro-md tracking-wider text-ink pointer-events-auto">
-            <span className="text-inkMuted hidden sm:inline mr-2 normal-case">
+            <span className="text-inkMuted hidden compact:inline mr-2 normal-case">
               For inquiries
             </span>
+            {/* Below 1100 the address is too long for the space it shares with
+                the brand mark, so it collapses to the icon alone. */}
             <a
               href="mailto:couldbekush@gmail.com"
-              className="font-bold underline hover:opacity-75 transition-opacity"
+              className="hidden compact:inline font-bold underline hover:opacity-75 transition-opacity"
             >
               couldbekush@gmail.com
+            </a>
+            <a
+              href="mailto:couldbekush@gmail.com"
+              aria-label="Email couldbekush"
+              className="compact:hidden inline-flex hover:opacity-70 transition-opacity"
+            >
+              <Send className="w-4 h-4" strokeWidth={1.75} />
             </a>
           </div>
           {/* Same type as the contact line above it — mono, micro-md, tracking

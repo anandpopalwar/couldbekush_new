@@ -106,7 +106,15 @@ interface SlotPose {
   scale: number;
   opacity: number;
   zIndex: number;
-  filter: string;
+  /** Blur radius in px. Kept numeric so the frame loop can compare it without
+      building a string every frame; `poseToTween` wraps it for GSAP. */
+  blur: number;
+}
+
+/** SlotPose in the shape GSAP wants — only the intro needs this. */
+function poseToTween(pose: SlotPose) {
+  const { blur, ...rest } = pose;
+  return { ...rest, filter: `blur(${blur}px)` };
 }
 
 /**
@@ -132,7 +140,9 @@ function slotPose(offset: number, viewportHeight: number): SlotPose {
     opacity: ramp(OPACITY_RAMP, depth),
     // Fine-grained so two cards straddling the centre never tie.
     zIndex: Math.round(100 - depth * 10),
-    filter: `blur(${ramp(BLUR_RAMP, depth).toFixed(2)}px)`,
+    // Rounded to a tenth of a pixel: blur is the most expensive property here,
+    // and finer steps than this are invisible but still force a repaint.
+    blur: Math.round(ramp(BLUR_RAMP, depth) * 10) / 10,
   };
 }
 
@@ -189,13 +199,39 @@ export function CardDeck2({
   const dragStartYRef = useRef(0);
   const dragStartPositionRef = useRef(0);
 
+  // Per-frame bookkeeping. `applied` is the last value written to each card, so
+  // an unchanged property is never written twice; `dirty` forces a pass after a
+  // mount or resize even though the position hasn't moved.
+  const appliedRef = useRef<Map<number, SlotPose & { interactive: boolean }>>(
+    new Map(),
+  );
+  const lastCentreRef = useRef<number | null>(null);
+  const dirtyRef = useRef(true);
+  // Cached so the loop never reads window.innerHeight, which can force layout.
+  const viewportHeightRef = useRef(
+    typeof window !== 'undefined' ? window.innerHeight : 900,
+  );
+
   const projectFor = useCallback(
     (key: number) => projects[((key % totalCount) + totalCount) % totalCount],
     [projects, totalCount],
   );
 
-  const viewportHeight = () =>
-    typeof window !== 'undefined' ? window.innerHeight : 900;
+  const viewportHeight = () => viewportHeightRef.current;
+
+  // Cards mounting or unmounting change what has to be written next frame.
+  useEffect(() => {
+    dirtyRef.current = true;
+  }, [slots]);
+
+  useEffect(() => {
+    const onResize = () => {
+      viewportHeightRef.current = window.innerHeight;
+      dirtyRef.current = true;
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const endIntro = useCallback(() => {
     introTweensRef.current.forEach((tween) => tween.kill());
@@ -219,7 +255,7 @@ export function CardDeck2({
   const placeCard = useCallback(
     (el: HTMLDivElement, key: number) => {
       if (introActiveRef.current) return;
-      gsap.set(el, slotPose(key - positionRef.current, viewportHeight()));
+      gsap.set(el, poseToTween(slotPose(key - positionRef.current, viewportHeight())));
     },
     [positionRef],
   );
@@ -227,6 +263,11 @@ export function CardDeck2({
   // The frame loop: render whatever position currently says. This is the whole
   // motion model — no tweens per card, so the deck can rest between two cards
   // and follow input continuously.
+  //
+  // Written to do as little as possible per frame: it bails entirely when the
+  // position hasn't moved, writes styles directly rather than through gsap.set,
+  // and skips any property whose value is unchanged. At rest it costs one
+  // float comparison; while scrolling, one transform write per card.
   useEffect(() => {
     const tick = () => {
       const centre = positionRef.current;
@@ -237,11 +278,36 @@ export function CardDeck2({
         else return;
       }
 
-      const vh = viewportHeight();
+      if (!dirtyRef.current && centre === lastCentreRef.current) return;
+      dirtyRef.current = false;
+      lastCentreRef.current = centre;
+
+      const vh = viewportHeightRef.current;
       cardsRef.current.forEach((el, key) => {
         const offset = key - centre;
-        gsap.set(el, slotPose(offset, vh));
-        el.style.pointerEvents = Math.abs(offset) <= 1 ? 'auto' : 'none';
+        const pose = slotPose(offset, vh);
+        const prev = appliedRef.current.get(key);
+
+        if (!prev || prev.y !== pose.y || prev.scale !== pose.scale) {
+          // translate3d keeps the card on its own compositor layer.
+          el.style.transform = `translate3d(0px, ${pose.y}px, 0px) scale(${pose.scale})`;
+        }
+        if (!prev || prev.opacity !== pose.opacity) {
+          el.style.opacity = String(pose.opacity);
+        }
+        if (!prev || prev.zIndex !== pose.zIndex) {
+          el.style.zIndex = String(pose.zIndex);
+        }
+        if (!prev || prev.blur !== pose.blur) {
+          el.style.filter = `blur(${pose.blur}px)`;
+        }
+
+        const interactive = Math.abs(offset) <= 1;
+        if (!prev || prev.interactive !== interactive) {
+          el.style.pointerEvents = interactive ? 'auto' : 'none';
+        }
+
+        appliedRef.current.set(key, { ...pose, interactive });
       });
 
       const rounded = Math.round(centre);
@@ -316,7 +382,7 @@ export function CardDeck2({
       const beat = INTRO_BEATS[Math.min(order, INTRO_BEATS.length - 1)];
       introTweensRef.current.push(
         gsap.to(el, {
-          ...pose,
+          ...poseToTween(pose),
           rotation: 0,
           startAt: { rotation: Math.sign(offset) * INTRO_KICK_DEG },
           duration: INTRO_DEAL_DURATION,

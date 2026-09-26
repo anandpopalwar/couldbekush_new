@@ -39,7 +39,8 @@
 
   /* Selected-work counter — the numeral rides Google Sans Flex's width axis */
   --counter-size: 7rem;
-  --counter-width: 138; /* wdth, range 25–151 (100 = normal) */
+  --counter-weight: 550; /* wght, range 1-1000 (400 = regular) */
+  --counter-width: 120; /* wdth, range 25–151 (100 = normal) */
   --counter-opsz: 144; /* max optical size; what auto picks at this size anyway */
 }
 
@@ -59,7 +60,7 @@
 @media (min-width: 1024px) {
   :root {
     --card-width: 320px;
-    --counter-size: 11rem;
+    --counter-size: 9.5rem;
   }
 }
 
@@ -120,7 +121,10 @@
    and can drop the browser's automatic optical sizing, which at this size would
    leave the numeral set with a small-text cut. 144 is what auto picks here. */
 .counter-numeral {
-  font-variation-settings: "wdth" var(--counter-width), "opsz" var(--counter-opsz);
+  font-variation-settings:
+    "wght" var(--counter-weight),
+    "wdth" var(--counter-width),
+    "opsz" var(--counter-opsz);
 }
 
 /* ── Right sidebar list ────────────────────────────────────────────────────

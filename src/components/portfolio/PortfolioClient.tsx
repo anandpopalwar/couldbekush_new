@@ -37,8 +37,8 @@ const WHEEL_TRAVEL_PER_CARD = 140;
 // stays legible instead of teleporting.
 const WHEEL_MAX_EVENT_DELTA = 220;
 // Quiet for this long means the gesture is over — settle.
-const WHEEL_SETTLE_MS = 90;
-const SNAP_DURATION = 0.42;
+const WHEEL_SETTLE_MS = 70;
+const SNAP_DURATION = 0.32;
 const SNAP_EASE = 'power3.out';
 
 // -- step (kept for later) --------------------------------------------------
@@ -262,8 +262,6 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
 
         <LeftSidebar
           activeProject={activeProject}
-          currentIndex={currentIndex}
-          totalCount={totalCount}
           activeSection={activeSection}
           onSelectSection={(section) => {
             setActiveSection(section);

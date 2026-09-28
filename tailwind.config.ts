@@ -47,6 +47,7 @@ const config: Config = {
         inkSubtle: "rgb(var(--color-ink-subtle) / <alpha-value>)",
         inkPlain: "rgb(var(--color-ink-plain) / <alpha-value>)",
         invert: "rgb(var(--color-invert) / <alpha-value>)",
+        accent: "rgb(var(--color-accent) / <alpha-value>)",
         accentDot: "rgb(var(--color-accent-dot) / <alpha-value>)",
       },
       fontFamily: {

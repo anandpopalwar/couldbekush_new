@@ -145,7 +145,7 @@ export function MobileMenu({
       role="dialog"
       aria-modal="true"
       aria-label="Menu"
-      className="compact:hidden page-canvas fixed inset-0 z-50 text-ink pointer-events-auto"
+      className="mobile-menu compact:hidden page-canvas fixed inset-0 z-50 text-ink pointer-events-auto"
     >
       {/* Blocks are positioned against the viewport rather than stacked in
           flow, so the proportions hold at any phone height: tagline at 30%,
@@ -168,7 +168,7 @@ export function MobileMenu({
           overrides itself back to sharp — same behaviour as the desktop nav. */}
       <nav
         ref={navRef}
-        className="group absolute left-4 top-[57%] flex flex-col items-start uppercase text-title-h3 leading-none"
+        className="mobile-menu-nav group absolute left-4 top-[57%] flex flex-col items-start uppercase text-title-h3 leading-none"
       >
         {NAV_ITEMS.map((item) => {
           const isActive = activeSection === item.id;
@@ -190,7 +190,7 @@ export function MobileMenu({
         })}
       </nav>
 
-      <div className="absolute left-4 right-6 bottom-5 flex items-end justify-between">
+      <div className="mobile-menu-footer absolute left-4 right-6 bottom-5 flex items-end justify-between">
         <div className="flex flex-col">
           <span className="text-label-xs text-inkMuted">For inquiries</span>
           <a

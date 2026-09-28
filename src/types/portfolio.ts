@@ -1,5 +1,7 @@
 export interface Project {
   id: string;
+  /** URL segment for /project/[slug]. */
+  slug: string;
   title: string;
   subtitle: string;
   category: string;

@@ -52,7 +52,37 @@ const OPACITY_RAMP = [1, 0.96, 0.9, 0.9];
 const BLUR_RAMP = [0, 3, 6, 6];
 
 // Pointer drag: how far you pull for one card.
-const DRAG_TRAVEL_PER_CARD = 220;
+const DRAG_TRAVEL_PER_CARD = 300;
+
+/**
+ * How sharply the deck is drawn into a card. 1 is linear — no detent at all;
+ * higher makes the last part of the journey happen faster, so the middle feels
+ * like work and the arrival feels immediate.
+ */
+const DETENT_POWER = 2.4;
+
+/**
+ * The deck's weight.
+ *
+ * Input drives `positionRef` linearly; this warps it on the way to being drawn.
+ * Distance from the nearest card is raised to a power, which leaves the exact
+ * midpoint between two cards untouched and compresses everything close to a
+ * card. The result is a detent: heavy to drag a card out of centre, quick to
+ * fall into the next one.
+ *
+ * It is continuous at the midpoint (|offset| 0.5 maps to 0.5), so there is no
+ * jump as the nearest card changes, and every integer maps to itself — a
+ * settled deck sits exactly where it would without any of this.
+ */
+function detent(position: number) {
+  const nearest = Math.round(position);
+  const offset = position - nearest;
+  const pulled =
+    (Math.sign(offset) * Math.abs(offset * 2) ** DETENT_POWER) / 2;
+  return nearest + pulled;
+}
+// Movement under this counts as a tap rather than a drag.
+const TAP_SLOP_PX = 6;
 
 // Intro, once per page load, and the only motion on the page that nobody asked
 // for — so it gets one gesture, borrowed from handling an actual deck: the cards
@@ -198,6 +228,9 @@ export function CardDeck2({
   const isDraggingRef = useRef(false);
   const dragStartYRef = useRef(0);
   const dragStartPositionRef = useRef(0);
+  // The card the pointer went down on, and whether it travelled since.
+  const tapKeyRef = useRef<number | null>(null);
+  const tapMovedRef = useRef(false);
 
   // Per-frame bookkeeping. `applied` is the last value written to each card, so
   // an unchanged property is never written twice; `dirty` forces a pass after a
@@ -255,7 +288,10 @@ export function CardDeck2({
   const placeCard = useCallback(
     (el: HTMLDivElement, key: number) => {
       if (introActiveRef.current) return;
-      gsap.set(el, poseToTween(slotPose(key - positionRef.current, viewportHeight())));
+      gsap.set(
+        el,
+        poseToTween(slotPose(key - detent(positionRef.current), viewportHeight())),
+      );
     },
     [positionRef],
   );
@@ -270,7 +306,10 @@ export function CardDeck2({
   // float comparison; while scrolling, one transform write per card.
   useEffect(() => {
     const tick = () => {
-      const centre = positionRef.current;
+      // Raw position drives the windowing and the centre index; the warped
+      // one is what gets drawn. Both round to the same card.
+      const raw = positionRef.current;
+      const centre = detent(raw);
 
       if (introActiveRef.current) {
         // An early scroll cancels the intro and hands the deck over.
@@ -398,10 +437,22 @@ export function CardDeck2({
   }, [slots, endIntro]);
 
   // Pointer drag — the deck follows the pointer directly, then settles.
+  //
+  // A tap is resolved here rather than with onClick on the card. The stage
+  // captures the pointer so a drag keeps tracking outside the card, and pointer
+  // capture retargets the resulting click to the stage — so a card's onClick
+  // never fires. Instead the card under the pointer is noted on the way down
+  // and acted on when the pointer comes up without having travelled.
   const handlePointerDown = (e: React.PointerEvent) => {
     isDraggingRef.current = true;
     dragStartYRef.current = e.clientY;
     dragStartPositionRef.current = positionRef.current;
+
+    const card = (e.target as HTMLElement).closest('[data-key]');
+    const key = card?.getAttribute('data-key');
+    tapKeyRef.current = key === null || key === undefined ? null : Number(key);
+    tapMovedRef.current = false;
+
     onGrab();
     endIntro();
     stageRef.current?.setPointerCapture(e.pointerId);
@@ -410,6 +461,7 @@ export function CardDeck2({
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!isDraggingRef.current) return;
     const travelled = e.clientY - dragStartYRef.current;
+    if (Math.abs(travelled) > TAP_SLOP_PX) tapMovedRef.current = true;
     positionRef.current =
       dragStartPositionRef.current + travelled / DRAG_TRAVEL_PER_CARD;
   };
@@ -417,6 +469,25 @@ export function CardDeck2({
   const handlePointerUp = () => {
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
+
+    const tappedKey = tapKeyRef.current;
+    tapKeyRef.current = null;
+
+    // A tap on the centre card opens it; a tap on a neighbour brings it in.
+    if (!tapMovedRef.current && tappedKey !== null) {
+      if (tappedKey === Math.round(positionRef.current)) {
+        const project = projectFor(tappedKey);
+        if (project) {
+          onSelectProject(project);
+          return;
+        }
+      } else {
+        const index = ((tappedKey % totalCount) + totalCount) % totalCount;
+        onGoToIndex(index, tappedKey > positionRef.current ? 'down' : 'up');
+        return;
+      }
+    }
+
     onSettle();
   };
 
@@ -427,11 +498,11 @@ export function CardDeck2({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      className="col-span-1 compact:col-start-4 compact:col-span-6 compact:row-start-1 h-full relative perspective-stage flex items-center justify-center pointer-events-auto cursor-grab active:cursor-grabbing overflow-visible touch-none select-none"
+      className="deck-stage col-span-1 compact:col-start-4 compact:col-span-6 compact:row-start-1 h-full relative perspective-stage flex items-center justify-center pointer-events-auto cursor-grab active:cursor-grabbing overflow-visible touch-none select-none"
     >
       {/* Scaled card dimension stage — h-full + items-center puts the centre card
           on the exact vertical middle of the viewport. */}
-      <div className="relative w-[var(--card-width)] aspect-[4/3] flex items-center justify-center">
+      <div className="deck-frame relative w-[var(--card-width)] aspect-[4/3] flex items-center justify-center">
         <div className="relative w-full h-full">
           {slots.map((key) => {
             const project = projectFor(key);
@@ -449,19 +520,7 @@ export function CardDeck2({
                     cardsRef.current.delete(key);
                   }
                 }}
-                onClick={() => {
-                  if (isDraggingRef.current) return;
-                  if (key === Math.round(positionRef.current)) {
-                    onSelectProject(project);
-                    return;
-                  }
-                  const index = ((key % totalCount) + totalCount) % totalCount;
-                  onGoToIndex(
-                    index,
-                    key > positionRef.current ? 'down' : 'up',
-                  );
-                }}
-                className="absolute inset-0 w-full h-full rounded-sm overflow-hidden bg-surface will-change-transform select-none cursor-pointer group"
+                className="deck-card absolute inset-0 w-full h-full rounded-sm overflow-hidden bg-surface will-change-transform select-none cursor-pointer group"
                 data-key={key}
               >
                 <div className="relative w-full h-full overflow-hidden">
@@ -487,7 +546,7 @@ export function CardDeck2({
 
       {/* Floating drag hint overlay */}
       <div
-        className={`absolute bottom-6 flex items-center space-x-2 text-inkMuted text-micro-md font-mono tracking-widest uppercase pointer-events-none transition-opacity duration-700 ${
+        className={`deck-hint absolute bottom-6 flex items-center space-x-2 text-inkMuted text-micro-md font-mono tracking-widest uppercase pointer-events-none transition-opacity duration-700 ${
           hintVisible ? 'opacity-60' : 'opacity-0'
         }`}
       >

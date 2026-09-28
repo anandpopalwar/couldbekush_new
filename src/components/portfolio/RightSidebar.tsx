@@ -192,12 +192,12 @@ export function RightSidebar({
   const themeColors = projects[currentIndex]?.themeColors;
 
   return (
-    <aside className="hidden compact:flex compact:col-start-10 compact:col-span-3 compact:row-start-1 h-full flex-col justify-between pointer-events-auto pl-0 pr-30 overflow-hidden relative">
+    <aside className="rail-right hidden compact:flex compact:col-start-10 compact:col-span-3 compact:row-start-1 h-full flex-col justify-between pointer-events-auto pl-0 pr-30 overflow-hidden relative">
       <div
         ref={viewportRef}
-        className="w-full h-full relative overflow-hidden touch-none"
+        className="rail-right-viewport w-full h-full relative overflow-hidden touch-none"
       >
-        <div ref={trackRef} className="absolute top-0 left-0 w-full will-change-transform">
+        <div ref={trackRef} className="rail-right-track absolute top-0 left-0 w-full will-change-transform">
           {Array.from({ length: slotCount }, (_, j) => {
             // Slot offset from center: negative = above (next projects),
             // positive = below (previous projects) — matching the card deck.
@@ -229,7 +229,7 @@ export function RightSidebar({
                     "--u": emphasis,
                   } as React.CSSProperties
                 }
-                className="rs-slot h-[150px] relative flex flex-col items-center justify-center text-center cursor-pointer select-none px-0 pr-28 "
+                className="rail-right-slot rs-slot h-[150px] relative flex flex-col items-center justify-center text-center cursor-pointer select-none px-0 pr-28 "
               >
                 <span className="rs-sub font-code uppercase mb-1">
                   {project.subtitle}
@@ -251,7 +251,7 @@ export function RightSidebar({
       {/* Selected project's theme swatches — fixed at the right edge, vertically centered
           (represents the theme of the currently selected project). */}
       {themeColors && themeColors.length > 0 && (
-        <div className="absolute right-6 top-1/2 -translate-y-1/2 hidden xl:flex space-x-1.5 pointer-events-none">
+        <div className="rail-right-swatches absolute right-6 top-1/2 -translate-y-1/2 hidden xl:flex space-x-1.5 pointer-events-none">
           {themeColors.map((color, i) => (
             <span
               key={i}
@@ -262,7 +262,7 @@ export function RightSidebar({
         </div>
       )}
 
-      {/* <div className="absolute bottom-6 right-6 z-30 font-mono text-micro-md font-bold text-ink uppercase tracking-wider flex items-center space-x-1 hover:opacity-75 transition-opacity cursor-pointer">
+      {/* <div className="rail-right-showreel absolute bottom-6 right-6 z-30 font-mono text-micro-md font-bold text-ink uppercase tracking-wider flex items-center space-x-1 hover:opacity-75 transition-opacity cursor-pointer">
         <span className="underline font-black">'25 showreel</span>
         <span className="text-micro-xs">▶</span>
       </div> */}

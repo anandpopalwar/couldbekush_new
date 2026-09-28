@@ -3,6 +3,7 @@ import { Project } from '@/types/portfolio';
 export const PROJECTS: Project[] = [
   {
     id: "01",
+    slug: "fromanother",
     themeColors: ["#1b2a6b", "#f2ede0", "#2f6bff"],
     title: "FROMANOTHER",
     subtitle: "Agency & Studio",
@@ -28,6 +29,7 @@ export const PROJECTS: Project[] = [
   },
   {
     id: "02",
+    slug: "iventions",
     themeColors: ["#e63946", "#f1faee", "#457b9d"],
     title: "IVENTIONS",
     subtitle: "Promotional",
@@ -54,6 +56,7 @@ export const PROJECTS: Project[] = [
   },
   {
     id: "03",
+    slug: "dafi-tropicdane",
     themeColors: ["#606c38", "#fefae0", "#dda15e"],
     title: "DAFI TROPICDANE",
     subtitle: "Furniture",
@@ -78,6 +81,7 @@ export const PROJECTS: Project[] = [
   },
   {
     id: "04",
+    slug: "district2-studio",
     themeColors: ["#22223b", "#c9ada7", "#f2e9e4"],
     title: "DISTRICT2 STUDIO",
     subtitle: "Agency & Studio Showcase",
@@ -102,6 +106,7 @@ export const PROJECTS: Project[] = [
   },
   {
     id: "05",
+    slug: "est-populo",
     themeColors: ["#e76f51", "#f4a261", "#e9c46a"],
     title: "EST POPULO",
     subtitle: "Agency & Studio",
@@ -122,6 +127,7 @@ export const PROJECTS: Project[] = [
   },
   {
     id: "06",
+    slug: "bison-studio",
     themeColors: ["#264653", "#2a9d8f", "#e9c46a"],
     title: "BISON STUDIO",
     subtitle: "3D & Visualization",
@@ -142,6 +148,7 @@ export const PROJECTS: Project[] = [
   },
   {
     id: "07",
+    slug: "won-j-you-studios",
     themeColors: ["#ef4444", "#f5e9c9", "#f59e0b"],
     title: "WON J. YOU STUDIOS",
     subtitle: "Personal Brand",
@@ -162,6 +169,7 @@ export const PROJECTS: Project[] = [
   },
   {
     id: "08",
+    slug: "mux-studio",
     themeColors: ["#6d28d9", "#a78bfa", "#22d3ee"],
     title: "MUX STUDIO",
     subtitle: "Research & UX",

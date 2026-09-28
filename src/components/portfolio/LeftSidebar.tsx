@@ -26,10 +26,10 @@ export function LeftSidebar({
   ];
 
   return (
-    <aside className="hidden compact:flex compact:col-start-1 compact:col-span-3 compact:row-start-1 h-full flex-col pointer-events-none text-ink relative">
+    <aside className="rail-left hidden compact:flex compact:col-start-1 compact:col-span-3 compact:row-start-1 h-full flex-col pointer-events-none text-ink relative">
       {/* Primary Section Nav Links — indented to the main column (aligns with Launch),
           raised to sit at the top header row like the reference. */}
-      <div className="p-6 pointer-events-auto">
+      <div className="rail-left-nav p-6 pointer-events-auto">
         <span className="block text-micro-md font-mono tracking-widest text-inkMuted uppercase mb-4">
           Menu
         </span>
@@ -58,7 +58,7 @@ export function LeftSidebar({
           labels never shift with content length; Recognition simply grows downward. */}
       <div
         ref={blurRef}
-        className="absolute top-[43%] left-5 right-6 grid grid-cols-2 gap-x-8 items-start"
+        className="rail-left-meta absolute top-[43%] left-5 right-6 grid grid-cols-2 gap-x-8 items-start"
       >
         {/* Label columns are `auto`, not a fixed 5rem: a fixed track left a
             short label like "Role" stranded far from its value. Launch and
@@ -97,7 +97,7 @@ export function LeftSidebar({
           position:fixed — both create a stacking context, and the number below would then
           blend against that instead of against main's background and the cards, which
           renders it solid white. */}
-      <div className="absolute bottom-2 left-0 w-screen flex justify-center pointer-events-none">
+      <div className="work-counter absolute bottom-2 left-0 w-screen flex justify-center pointer-events-none">
         <span
           ref={blurRef}
           className="counter-numeral text-[length:var(--counter-size)] tracking-tight text-invert mix-blend-difference inline-block leading-none tabular-nums"
@@ -107,7 +107,7 @@ export function LeftSidebar({
       </div>
 
       {/* Scroll hint — bottom, inset from the left edge to match the right-side padding */}
-      <div className="absolute bottom-6 left-5 text-micro-md tracking-wide text-inkMuted">
+      <div className="scroll-hint absolute bottom-6 left-5 text-micro-md tracking-wide text-inkMuted">
         Scroll
       </div>
     </aside>

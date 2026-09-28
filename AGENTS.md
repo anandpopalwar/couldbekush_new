@@ -25,9 +25,16 @@ src/
 ├── app/
 │   ├── layout.tsx          # Root layout with fonts, metadata (no padding)
 │   ├── page.tsx            # Main portfolio page (client component)
+│   ├── template.tsx        # The route transition, both halves — useRouteSlide()
+│   ├── project/[slug]/     # The case study page
 │   └── globals.css         # Global styles, 3D perspective, shadows
 ├── components/
+│   ├── transition/
+│   │   └── SlideLink.tsx   # Anchor that navigates through the slide
 │   ├── portfolio/
+│   │   ├── ProjectChrome.tsx # The site's furniture on a case study
+│   │   ├── HeavyScroll.tsx # Weighted scroller; publishes the two fade vars
+│   │   ├── PageEnter.tsx   # Step 4 of the transition — the arrival bounce
 │   │   ├── TopHeader.tsx   # Brand mark, nav, audio toggle, inquiries
 │   │   ├── LeftSidebar.tsx # Menu nav, project metadata, counter
 │   │   ├── CardDeck.tsx    # Diagonal 3D card stack (superseded by CardDeck2)
@@ -44,6 +51,8 @@ src/
 │       └── Toast.tsx        # Toast notifications
 ├── data/
 │   └── projects.ts         # 8 portfolio projects with metadata
+├── lib/
+│   └── routeTransition.ts  # Carries the destination name across the boundary
 ├── hooks/
 │   ├── useAudioFeedback.ts # Web Audio API paper flip sounds
 │   └── useTransitionBlur.ts# Blur-while-moving, shared by sidebar + mobile
@@ -159,6 +168,74 @@ Invisible Arc (bottom half): Top cards → Bottom cards (instant, opacity 0)
 - Bandpass filtered noise + triangle oscillator
 - Direction-aware frequency sweeps
 
+## The case study route
+
+`/project/[slug]` — one project, full width, reached from the deck or from the
+previous case study. `body` is `overflow: hidden` for the deck, so the page
+carries its own scroller rather than fighting that rule.
+
+### Layout
+- **The work is centred on the viewport, not on its grid track.** The rail is
+  `fixed` on the left and the minimap `fixed` on the right, so the middle column
+  is sized by `--shot-width` and positioned by `--shot-lead`, which is
+  back-solved from it. The trailing `1fr` track is empty and **must stay
+  declared** — it is what balances the lead track. The shots keep an explicit
+  `compact:col-start-2` for the same reason grid auto-placement bit before:
+  taking an item out of flow frees its cell and the survivors shuffle into it.
+- `--shot-width` has a floor (`100vw - 48rem`) that keeps the column clear of
+  the fixed rail; below ~1290px that floor is what is actually in effect.
+- `--shot-top` centres the *first* shot on the viewport, plus `--shot-drop`.
+- **Below `compact` the page restructures**: the scroller becomes
+  `flex flex-col` purely so the title can be `order-first` while staying last in
+  the DOM, the rail and minimap return to the flow, and the minimap is hidden.
+
+### The two fades
+`HeavyScroll` publishes two custom properties on the scroller and everything
+inside inherits them — no element needs its own listener.
+
+| Property | Class | Meaning |
+|----------|-------|---------|
+| `--scroll-fade` | `.fade-on-scroll` | 0 at the top, 1 past `FADE_DISTANCE` |
+| `--outro-fade` | `.fade-at-end` | 0 while the last screen is below the fold, 1 once it fills |
+
+`data-outro="on"` also drops the faded elements out of the pointer path, so an
+invisible rail can't swallow a click meant for the full-screen link under it.
+**Both rules are scoped to `min-width: 1100px`** — below that neither element is
+furniture any more and fading them against scroll would dissolve the page's own
+heading the moment you moved.
+
+### The route transition
+Owned end to end by `src/app/(frontend)/template.tsx`, which exports
+`useRouteSlide()`. `SlideLink` is the anchor that calls it; `routeTransition.ts`
+carries the destination's name across the boundary, keyed by href so a stale
+label can't leak.
+
+    rising → named → (navigate) → holding → leaving → idle
+
+1. the slide rises over the page being left
+2. the destination's name fades in on it, then the route changes
+3. the arriving side picks the slide up and carries it down
+4. the page bounces in underneath (`PageEnter`)
+
+Things that are load-bearing:
+- **Phase is decided in a lazy `useState` initialiser, not an effect.** An
+  effect runs after first paint, so the arriving route flashes uncovered.
+- **A template's key is its own segment level.** This one is keyed `/project`
+  for *every* case study, so going from one to the next does **not** remount it
+  — the initialiser never re-runs. A `pathname` effect picks the slide up in
+  that case, and `page.tsx` keys `<HeavyScroll>` on the slug so the page, its
+  scroll position and `PageEnter` all actually reset.
+- **An empty label is not "no label".** `""` means an announced arrival with
+  nothing to paint (the trip home); `null` means nothing announced it. Test for
+  `null`, never truthiness.
+- **The slides are CSS class transitions, not gsap.** gsap animates `yPercent`
+  through its own transform cache while Tailwind writes `--tw-translate-y`; the
+  two disagree about where the element starts and the slide snaps instead of
+  travelling. This cost three separate debugging rounds.
+- `route-content` must stay untransformed and keep `h-full` — the case study's
+  scroller, rail and chrome are all `fixed`, and a transform on an ancestor
+  makes them resolve against *it* instead of the viewport.
+
 ## Design System
 
 **Everything is tokenized. Never write a literal colour, size or family in a
@@ -177,6 +254,10 @@ The source of truth is `:root` in `src/app/(frontend)/globals.css`.
   - Text: `ink`, `inkMuted`, `inkSubtle`, `inkPlain` (list items off centre),
     `invert`
   - Accents: `accentDot`, `--color-grain`
+- **Case study layout** is tokenized too: `--shot-width` (45vw less 10%, floored so the
+  column never runs under the fixed rail), `--shot-lead` (the grid track that
+  puts it on the *viewport* centre rather than its own track) and `--shot-top`
+  (the padding that centres the first shot vertically on load).
 - **In raw CSS**, wrap them: `rgb(var(--color-ink))`.
 - **In JS**, read them rather than redeclaring — see `ramp()` in
   RightSidebar.tsx, which resolves `--color-ink` / `--color-ink-plain` with
@@ -222,6 +303,29 @@ weight, so one `text-*` class is the whole style.
 | `text-doc-label` / `text-doc-paragraph` | 18/32 | -1.5% | 500 / 400 |
 
 - Titles pair with `font-display`; subheadings are drawn for `uppercase`.
+
+### Marker classes
+Every component's root element carries one unprefixed class naming **where it
+sits**, so the DOM is readable in the inspector without matching Tailwind
+strings against source files.
+
+| Region | Markers |
+|--------|---------|
+| Shell | `app-shell`, `app-viewport`, `route-content`, `route-transition` |
+| Chrome | `chrome-header`, `chrome-contact`, `chrome-status`, `chrome-audio`, `chrome-brand`, `chrome-nav` |
+| Left rail | `rail-left`, `rail-left-nav`, `rail-left-meta`, `work-counter`, `scroll-hint` |
+| Right rail | `rail-right`, `rail-right-viewport`, `rail-right-track`, `rail-right-slot`, `rail-right-swatches`, `rail-right-showreel` |
+| Deck | `deck-stage`, `deck-frame`, `deck-card`, `deck-hint` |
+| Below 1100 | `menu-toggle`, `mobile-brand`, `mobile-counter`, `mobile-detail`, `mobile-swatches`, `mobile-menu`, `mobile-menu-nav`, `mobile-menu-footer` |
+| Case study | `case-study`, `case-study-body`, `case-study-rail`, `case-study-shots`, `case-study-shot`, `case-study-minimap`, `case-study-title`, `case-study-next` |
+| Overlays | `grain-overlay`, `toast` |
+
+**They carry no styles and must not be given any.** Styling lives in Tailwind
+tokens; these exist only to identify. The styled non-Tailwind classes are a
+separate, named set — `page-canvas`, `rs-*`, `counter-numeral`, `title-wide`,
+`font-display` / `font-text`, `fade-on-scroll` / `fade-at-end`,
+`perspective-stage`, `no-scrollbar` — and those do
+carry rules in globals.css.
 
 ### Layout breakpoints
 Named screens in `tailwind.config.ts`, matching the reference site's page

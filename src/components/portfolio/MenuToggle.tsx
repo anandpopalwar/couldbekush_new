@@ -31,7 +31,7 @@ export function MenuToggle({ open, onToggle }: MenuToggleProps) {
       onClick={onToggle}
       aria-label={open ? 'Close menu' : 'Open menu'}
       aria-expanded={open}
-      className="compact:hidden fixed top-5 left-4 z-[60] w-16 h-7 pointer-events-auto hover:opacity-70 transition-opacity"
+      className="menu-toggle compact:hidden fixed top-5 left-4 z-[60] w-16 h-7 pointer-events-auto hover:opacity-70 transition-opacity"
     >
       <span
         className={`${rule} ${

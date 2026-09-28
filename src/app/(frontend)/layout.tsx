@@ -10,6 +10,13 @@ const googleSans = Google_Sans_Flex({
   variable: '--font-google-sans',
   display: 'swap',
   axes: ['opsz', 'wdth'],
+  // Next builds a size-adjusted fallback from its own metrics database so text
+  // doesn't shift when the real font swaps in. Google Sans Flex isn't in that
+  // database yet, so it warns and skips the fallback anyway. Turning the
+  // attempt off silences the warning; the stack below stands in, picked because
+  // its metrics are close enough to keep the swap unobtrusive.
+  adjustFontFallback: false,
+  fallback: ['Helvetica Neue', 'Arial', 'system-ui', 'sans-serif'],
 });
 
 // The monospaced companion, used where the design calls for a code face —
@@ -18,14 +25,17 @@ const googleSansCode = Google_Sans_Code({
   subsets: ['latin'],
   variable: '--font-google-sans-code',
   display: 'swap',
+  // Same story — no metrics shipped for this family either.
+  adjustFontFallback: false,
+  fallback: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
 });
 
 export const metadata: Metadata = {
-  title: 'couldbekush — selected work',
+  title: 'couldbekush',
   description:
     'Selected work by couldbekush, an independent designer working globally.',
   openGraph: {
-    title: 'couldbekush — selected work',
+    title: 'couldbekush',
     description:
       'Selected work by couldbekush, an independent designer working globally.',
     type: 'website',

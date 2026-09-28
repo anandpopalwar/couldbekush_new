@@ -16,7 +16,7 @@ still cite it as the source of a layout decision.)
 - **Styling**: Tailwind CSS 3.4
 - **Animations**: GSAP 3.12
 - **Icons**: Lucide React
-- **Fonts**: Inter (sans), JetBrains Mono (mono)
+- **Fonts**: Google Sans Flex (everything), Google Sans Code (the mono line)
 - **Build**: PostCSS, Autoprefixer
 
 ## Project Structure
@@ -25,15 +25,25 @@ src/
 ├── app/
 │   ├── layout.tsx          # Root layout with fonts, metadata (no padding)
 │   ├── page.tsx            # Main portfolio page (client component)
+│   ├── template.tsx        # The route transition, both halves — useRouteSlide()
+│   ├── project/[slug]/     # The case study page
 │   └── globals.css         # Global styles, 3D perspective, shadows
 ├── components/
+│   ├── transition/
+│   │   └── SlideLink.tsx   # Anchor that navigates through the slide
 │   ├── portfolio/
+│   │   ├── ProjectChrome.tsx # The site's furniture on a case study
+│   │   ├── HeavyScroll.tsx # Weighted scroller; publishes the two fade vars
+│   │   ├── PageEnter.tsx   # Step 4 of the transition — the arrival bounce
 │   │   ├── TopHeader.tsx   # Brand mark, nav, audio toggle, inquiries
 │   │   ├── LeftSidebar.tsx # Menu nav, project metadata, counter
 │   │   ├── CardDeck.tsx    # Diagonal 3D card stack (superseded by CardDeck2)
 │   │   ├── CardDeck2.tsx   # Vertical conveyor deck — the one in use
-│   │   ├── PortfolioClient.tsx # Client shell: index state, wheel/keyboard nav
+│   │   ├── PortfolioClient.tsx # Client shell: owns the deck position + input
 │   │   ├── RightSidebar.tsx# Infinite scroll project list (center bold)
+│   │   ├── MobileChrome.tsx# The stacked layout below 1100px
+│   │   ├── MobileMenu.tsx  # Full-screen menu for that layout
+│   │   ├── MenuToggle.tsx  # The two rules that morph into a cross
 │   │   ├── ProjectModal.tsx# Full project detail modal
 │   │   └── SectionModal.tsx# About, Playground, Contact modals
 │   └── ui/
@@ -41,8 +51,11 @@ src/
 │       └── Toast.tsx        # Toast notifications
 ├── data/
 │   └── projects.ts         # 8 portfolio projects with metadata
+├── lib/
+│   └── routeTransition.ts  # Carries the destination name across the boundary
 ├── hooks/
-│   └── useAudioFeedback.ts # Web Audio API paper flip sounds
+│   ├── useAudioFeedback.ts # Web Audio API paper flip sounds
+│   └── useTransitionBlur.ts# Blur-while-moving, shared by sidebar + mobile
 └── types/
     └── portfolio.ts        # Project & NavSection types
 ```
@@ -55,22 +68,31 @@ reference but is commented out.
 
 - **Vertical, not diagonal**: every card sits at `x: 0` with no rotation. The
   selected card is on the exact vertical middle of the viewport.
-- **Conveyor, not carousel**: a five-slot window is rendered around an unbounded
-  `virtual` counter, each card keyed by its virtual position. Keys never repeat,
-  so a card element is never reused for another position — there is no wrap and
-  no teleport to catch when scrolling fast. Cards mount off screen, slide, and
-  unmount off screen. A departing card stays mounted until its exit tween ends,
-  so a multi-step jump slides the old card away instead of vanishing it.
-- `currentIndex` from the parent is wrapped, so the deck derives its own step
-  direction via the shortest signed path and keeps the unbounded counter itself.
+- **Driven by a continuous position, not steps.** The deck's whole state is one
+  float — `positionRef`, in card units, owned by `PortfolioClient`. An integer
+  centres that card; 4.5 sits exactly between two. Input writes to it and the
+  deck renders whatever it says, once per frame. There are no per-card tweens.
+  That is what lets a scroll be *followed* as it happens and snapped only when
+  it stops; a stepping model can never rest between two cards.
+- **Conveyor, not carousel**: a short ring of slots around the rounded position,
+  each keyed by its virtual index. Keys never repeat, so a card element is never
+  reused for another position — no wrap, no teleport to catch when scrolling
+  fast. Cards mount and unmount beyond the screen edge.
 - **Slot geometry**: slot ±1 is parked with its centre on the viewport edge —
   half the card on screen, half cut off — so the distance is viewport-relative
   (`innerHeight / 2`), not a fixed pixel gap. Slot ±2 is a full card height
   beyond that, off screen, and is where cards mount and unmount.
 - Centre card is `CENTER_SCALE` (1.3x); depth is carried by scale and a
-  depth-of-field blur (`SLOT_BLUR`) since a vertical stack has no diagonal
-  offset to read it from. `filter` is part of `SlotPose`, so blur interpolates
-  with position — a card sharpens as it travels into centre. No card shadows.
+  depth-of-field blur. The ramps (`SCALE_RAMP`, `OPACITY_RAMP`, `BLUR_RAMP`) are
+  read at *fractional* distances, so a card halfway between slots is half-scaled
+  and half-blurred. At whole numbers they give the resting values exactly.
+- **The frame loop is written to do as little as possible**: it bails on an
+  unchanged position, writes styles directly rather than through `gsap.set`,
+  skips any property whose value hasn't changed, and caches the viewport height
+  so it never reads `innerHeight`. Blur is numeric in `SlotPose` and rounded to
+  0.1px — it's the most expensive property here and was being reassigned 60×/s
+  with an identical value. `poseToTween()` converts a pose back to GSAP's shape;
+  the intro is the only thing that needs it.
 - **Intro, once per load**: the deck is set down as a loose hand-stacked pile
   (deterministic per-card jitter), squares up, then cards are flicked out one at
   a time with a spin that unwinds on landing, on an uneven dealer's rhythm
@@ -130,18 +152,89 @@ Invisible Arc (bottom half): Top cards → Bottom cards (instant, opacity 0)
 ### LeftSidebar.tsx
 - Navigation menu (WORK, ABOUT, PLAYGROUND, CONTACT)
 - Project metadata grid (Role, Launch, Recognition)
-- Large project counter (e.g., "01/08"), centred on the **screen** via
+- Large project counter — the number alone, centred on the **screen** via
   `left-0 w-screen flex justify-center` — the aside is only 3 of 12 columns but
   starts at the viewport edge. Never centre it with `-translate-x-1/2` or
   `position: fixed`: both create a stacking context, and the counter's
   `mix-blend-difference` would then blend against that instead of `main`'s
   background and the cards, rendering the number solid white.
+- Its size, weight, width and optical size are all `--counter-*` tokens. Weight
+  is set through `font-variation-settings` rather than a `font-*` class, since
+  the design calls for 550 and Tailwind only offers 500 and 600.
 
 ### useAudioFeedback.ts
 - Web Audio API synthesis
 - Paper flip/page turn sounds
 - Bandpass filtered noise + triangle oscillator
 - Direction-aware frequency sweeps
+
+## The case study route
+
+`/project/[slug]` — one project, full width, reached from the deck or from the
+previous case study. `body` is `overflow: hidden` for the deck, so the page
+carries its own scroller rather than fighting that rule.
+
+### Layout
+- **The work is centred on the viewport, not on its grid track.** The rail is
+  `fixed` on the left and the minimap `fixed` on the right, so the middle column
+  is sized by `--shot-width` and positioned by `--shot-lead`, which is
+  back-solved from it. The trailing `1fr` track is empty and **must stay
+  declared** — it is what balances the lead track. The shots keep an explicit
+  `compact:col-start-2` for the same reason grid auto-placement bit before:
+  taking an item out of flow frees its cell and the survivors shuffle into it.
+- `--shot-width` has a floor (`100vw - 48rem`) that keeps the column clear of
+  the fixed rail; below ~1290px that floor is what is actually in effect.
+- `--shot-top` centres the *first* shot on the viewport, plus `--shot-drop`.
+- **Below `compact` the page restructures**: the scroller becomes
+  `flex flex-col` purely so the title can be `order-first` while staying last in
+  the DOM, the rail and minimap return to the flow, and the minimap is hidden.
+
+### The two fades
+`HeavyScroll` publishes two custom properties on the scroller and everything
+inside inherits them — no element needs its own listener.
+
+| Property | Class | Meaning |
+|----------|-------|---------|
+| `--scroll-fade` | `.fade-on-scroll` | 0 at the top, 1 past `FADE_DISTANCE` |
+| `--outro-fade` | `.fade-at-end` | 0 while the last screen is below the fold, 1 once it fills |
+
+`data-outro="on"` also drops the faded elements out of the pointer path, so an
+invisible rail can't swallow a click meant for the full-screen link under it.
+**Both rules are scoped to `min-width: 1100px`** — below that neither element is
+furniture any more and fading them against scroll would dissolve the page's own
+heading the moment you moved.
+
+### The route transition
+Owned end to end by `src/app/(frontend)/template.tsx`, which exports
+`useRouteSlide()`. `SlideLink` is the anchor that calls it; `routeTransition.ts`
+carries the destination's name across the boundary, keyed by href so a stale
+label can't leak.
+
+    rising → named → (navigate) → holding → leaving → idle
+
+1. the slide rises over the page being left
+2. the destination's name fades in on it, then the route changes
+3. the arriving side picks the slide up and carries it down
+4. the page bounces in underneath (`PageEnter`)
+
+Things that are load-bearing:
+- **Phase is decided in a lazy `useState` initialiser, not an effect.** An
+  effect runs after first paint, so the arriving route flashes uncovered.
+- **A template's key is its own segment level.** This one is keyed `/project`
+  for *every* case study, so going from one to the next does **not** remount it
+  — the initialiser never re-runs. A `pathname` effect picks the slide up in
+  that case, and `page.tsx` keys `<HeavyScroll>` on the slug so the page, its
+  scroll position and `PageEnter` all actually reset.
+- **An empty label is not "no label".** `""` means an announced arrival with
+  nothing to paint (the trip home); `null` means nothing announced it. Test for
+  `null`, never truthiness.
+- **The slides are CSS class transitions, not gsap.** gsap animates `yPercent`
+  through its own transform cache while Tailwind writes `--tw-translate-y`; the
+  two disagree about where the element starts and the slide snaps instead of
+  travelling. This cost three separate debugging rounds.
+- `route-content` must stay untransformed and keep `h-full` — the case study's
+  scroller, rail and chrome are all `fixed`, and a transform on an ancestor
+  makes them resolve against *it* instead of the viewport.
 
 ## Design System
 
@@ -161,6 +254,10 @@ The source of truth is `:root` in `src/app/(frontend)/globals.css`.
   - Text: `ink`, `inkMuted`, `inkSubtle`, `inkPlain` (list items off centre),
     `invert`
   - Accents: `accentDot`, `--color-grain`
+- **Case study layout** is tokenized too: `--shot-width` (45vw less 10%, floored so the
+  column never runs under the fixed rail), `--shot-lead` (the grid track that
+  puts it on the *viewport* centre rather than its own track) and `--shot-top`
+  (the padding that centres the first shot vertically on load).
 - **In raw CSS**, wrap them: `rgb(var(--color-ink))`.
 - **In JS**, read them rather than redeclaring — see `ramp()` in
   RightSidebar.tsx, which resolves `--color-ink` / `--color-ink-plain` with
@@ -207,6 +304,29 @@ weight, so one `text-*` class is the whole style.
 
 - Titles pair with `font-display`; subheadings are drawn for `uppercase`.
 
+### Marker classes
+Every component's root element carries one unprefixed class naming **where it
+sits**, so the DOM is readable in the inspector without matching Tailwind
+strings against source files.
+
+| Region | Markers |
+|--------|---------|
+| Shell | `app-shell`, `app-viewport`, `route-content`, `route-transition` |
+| Chrome | `chrome-header`, `chrome-contact`, `chrome-status`, `chrome-audio`, `chrome-brand`, `chrome-nav` |
+| Left rail | `rail-left`, `rail-left-nav`, `rail-left-meta`, `work-counter`, `scroll-hint` |
+| Right rail | `rail-right`, `rail-right-viewport`, `rail-right-track`, `rail-right-slot`, `rail-right-swatches`, `rail-right-showreel` |
+| Deck | `deck-stage`, `deck-frame`, `deck-card`, `deck-hint` |
+| Below 1100 | `menu-toggle`, `mobile-brand`, `mobile-counter`, `mobile-detail`, `mobile-swatches`, `mobile-menu`, `mobile-menu-nav`, `mobile-menu-footer` |
+| Case study | `case-study`, `case-study-body`, `case-study-rail`, `case-study-shots`, `case-study-shot`, `case-study-minimap`, `case-study-title`, `case-study-next` |
+| Overlays | `grain-overlay`, `toast` |
+
+**They carry no styles and must not be given any.** Styling lives in Tailwind
+tokens; these exist only to identify. The styled non-Tailwind classes are a
+separate, named set — `page-canvas`, `rs-*`, `counter-numeral`, `title-wide`,
+`font-display` / `font-text`, `fade-on-scroll` / `fade-at-end`,
+`perspective-stage`, `no-scrollbar` — and those do
+carry rules in globals.css.
+
 ### Layout breakpoints
 Named screens in `tailwind.config.ts`, matching the reference site's page
 variants. Added **alongside** Tailwind's defaults, which still work.
@@ -220,29 +340,37 @@ variants. Added **alongside** Tailwind's defaults, which still work.
 | `ultra:` | 2400+ | |
 
 They live in the config, not as CSS tokens, because a media query cannot read a
-custom property. Note the sidebars still use `hidden md:flex` (768px), so they
-appear well before the reference's mobile variant ends at 1099 — switch those to
-`compact:` / `wide:` if matching that layout exactly matters.
+custom property.
+
+Below `compact` the whole layout changes: both sidebars are hidden and
+`MobileChrome` renders the stacked variant instead — deck, project detail
+beneath it, page number under the menu button. The header's contact line also
+collapses to a paper-plane icon there.
 
 Typography breakpoints on the reference use different boundaries again
 (display 23/29/40/60px stepping at 1200/1440/1920; body at 1100/1800). Not
 adopted — recorded here in case it comes up.
 
 ### Interactions
-Wheel constants live at the top of `PortfolioClient.tsx`.
+Constants live at the top of `PortfolioClient.tsx`. `SCROLL_MODEL` picks between
+two implementations, both present in the file:
 
-- Wheel scroll: 60px of travel per step, 110ms between steps, leftover travel
-  capped at 4 steps' worth
-- The deck steps like a ratchet, not a flow: a step spends exactly one
-  threshold's worth of travel and keeps the remainder, so scrolling maps to
-  cards proportionally and a fast scroll streams. A 100ms idle timer clears
-  whatever is left, so it never coasts once your hand stops.
-- The cooldown is deliberately shorter than the card tween (110ms vs 300ms) so a
-  sustained scroll starts the next card before the last one settles. Raise it
-  and the deck lands on every card in turn; that reads as a stutter.
-- Drag: 45px threshold for card change
-- Keyboard: Arrow keys, Space bar
-- Touch: pointer events with capture
+- **`'follow'` (in use)** — the wheel moves the position directly
+  (`WHEEL_TRAVEL_PER_CARD`, 140px per card) and the deck settles onto the
+  nearest card once the wheel is quiet for `WHEEL_SETTLE_MS` (70ms), easing over
+  `SNAP_DURATION` (0.32s). There is no threshold and no lock: inertia simply
+  keeps moving the deck, as a native scroll would, instead of being something to
+  tell apart from intent. Snappiness lives in the settle timings, not in
+  `WHEEL_TRAVEL_PER_CARD` — that governs the hand-to-card mapping.
+- **`'step'`** — the earlier model: measure a gesture, jump a whole number of
+  cards, then ignore input briefly to swallow inertia. Fine on a mouse wheel,
+  mechanical on a trackpad. Kept for comparison.
+- **Drag** is direct manipulation too — the card follows the pointer at
+  `DRAG_TRAVEL_PER_CARD` (220px per card) and settles on release.
+- **All three inputs must agree on direction.** Scrolling down, dragging up and
+  Arrow Down all go to `position - 1`, which brings the card below up into
+  centre. The arrows were once mapped the other way and fought the deck.
+- Keyboard: arrows and space, rate-limited by `STEP_COOLDOWN_MS`.
 
 ## Projects Data
 8 portfolio projects (IDs 01-08):

@@ -16,6 +16,7 @@ const toPortfolioProject = (p: PayloadProject, index: number): Project => {
   const firstCategory = p.categories?.find((c) => typeof c !== "string");
   return {
     id: String(index + 1).padStart(2, "0"),
+    slug: p.slug ?? "",
     title: p.title,
     subtitle: p.subtitle ?? "",
     category: firstCategory && typeof firstCategory !== "string" ? firstCategory.name : p.subtitle ?? "",
@@ -68,4 +69,15 @@ export async function getProjects(): Promise<Project[]> {
     );
     return PROJECTS;
   }
+}
+
+/**
+ * One project by slug, for /project/[slug]. Reuses getProjects rather than
+ * querying again: the list is already revalidated and cached, the deck is
+ * almost always rendered alongside, and eight projects is not worth a second
+ * round trip. It also means the static fallback works here for free.
+ */
+export async function getProject(slug: string): Promise<Project | undefined> {
+  const projects = await getProjects();
+  return projects.find((p) => p.slug === slug);
 }

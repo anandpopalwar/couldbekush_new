@@ -10,7 +10,8 @@ import { TopHeader } from '@/components/portfolio/TopHeader';
 import { LeftSidebar } from '@/components/portfolio/LeftSidebar';
 import { CardDeck } from '@/components/portfolio/CardDeck';
 import { RightSidebar } from '@/components/portfolio/RightSidebar';
-import { ProjectModal } from '@/components/portfolio/ProjectModal';
+import { useRouter } from 'next/navigation';
+import { useRouteSlide } from '@/app/(frontend)/template';
 import { SectionModal } from '@/components/portfolio/SectionModal';
 import { CardDeck2 } from './CardDeck2';
 import { MobileChrome } from '@/components/portfolio/MobileChrome';
@@ -32,14 +33,14 @@ const SCROLL_MODEL: 'follow' | 'step' = 'follow';
 // -- follow ----------------------------------------------------------------
 // deltaY for one card. A mouse notch (~100) moves most of a card and then
 // settles onto it, so a notch still reads as exactly one card.
-const WHEEL_TRAVEL_PER_CARD = 140;
+const WHEEL_TRAVEL_PER_CARD = 320;
 // A single event can't throw the deck further than this, so one violent flick
 // stays legible instead of teleporting.
 const WHEEL_MAX_EVENT_DELTA = 220;
 // Quiet for this long means the gesture is over — settle.
-const WHEEL_SETTLE_MS = 90;
-const SNAP_DURATION = 0.42;
-const SNAP_EASE = 'power3.out';
+const WHEEL_SETTLE_MS = 70;
+const SNAP_DURATION = 0.4;
+const SNAP_EASE = 'power4.out';
 
 // -- step (kept for later) --------------------------------------------------
 const WHEEL_STEP_THRESHOLD = 90;
@@ -47,6 +48,11 @@ const WHEEL_MAX_STEPS = 3;
 const WHEEL_MAX_PENDING = WHEEL_STEP_THRESHOLD * WHEEL_MAX_STEPS;
 const WHEEL_GESTURE_LOCK_MS = 260;
 
+// Leaving for a case study: the deck is covered before the route changes, so it
+// doesn't simply vanish. The template plays the arrival at the far end, and both
+// panels are --color-surface, so the handoff between them is invisible.
+// The slide's own duration lives in its Tailwind class (duration-[900ms]) so
+// one declaration owns the transition. This is only the backstop: transitionend
 // Rate limit for keys, so a held arrow doesn't retarget every frame.
 const STEP_COOLDOWN_MS = 110;
 
@@ -54,7 +60,7 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
   const totalCount = projects.length;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+
   const [activeSection, setActiveSection] = useState<NavSection>('work');
   // Mobile menu. Held here so the deck's input handlers can ignore wheel and
   // key events while the full-screen panel is open.
@@ -70,7 +76,18 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
   // is. Integers centre a card; anything between means the deck is mid-scroll.
   const positionRef = useRef(0);
 
+  const router = useRouter();
+  const { slideTo } = useRouteSlide();
   const { audioEnabled, toggleAudio, playDeckSound } = useAudioFeedback();
+
+  // The slide, its timings and its panel all live in the template, which owns
+  // both halves of the transition — see useRouteSlide.
+  const openProject = useCallback(
+    (project: Project) => {
+      slideTo(`/project/${project.slug}`, project.title);
+    },
+    [slideTo],
+  );
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -129,7 +146,13 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
   // Liquid human-action native wheel scroll handler
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
-      if (selectedProject || activeSection !== 'work' || menuOpen) return;
+      if (activeSection !== 'work' || menuOpen) return;
+
+      // Leave horizontal gestures to the browser: a two-finger sideways swipe
+      // is the back/forward navigation, and preventing it here silently kills
+      // it. The deck only ever wants the vertical axis.
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+
       e.preventDefault();
 
       if (SCROLL_MODEL === 'follow') {
@@ -179,12 +202,12 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
 
     window.addEventListener('wheel', handleWheel, { passive: false });
     return () => window.removeEventListener('wheel', handleWheel);
-  }, [settle, animateTo, selectedProject, activeSection, menuOpen]);
+  }, [settle, animateTo, activeSection, menuOpen]);
 
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (selectedProject || activeSection !== 'work' || menuOpen) return;
+      if (activeSection !== 'work' || menuOpen) return;
 
       // Match the wheel and the drag: scrolling down (deltaY > 0) and dragging
       // up both go to currentIndex - 1, bringing the card below up into centre.
@@ -204,12 +227,12 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [animateTo, selectedProject, activeSection, menuOpen]);
+  }, [animateTo, activeSection, menuOpen]);
 
   const activeProject = projects[currentIndex];
 
   return (
-    <div className="w-full h-full relative overflow-hidden select-none">
+    <div className="app-shell w-full h-full relative overflow-hidden select-none">
       <GrainOverlay />
 
       <TopHeader
@@ -226,7 +249,7 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
       {/* Main Viewport — carries the page background so the counter's mix-blend-difference
           has a real backdrop to invert against (main is a z-20 stacking context, so a
           transparent main would blend against nothing and render the number solid white). */}
-      <main className="page-canvas w-full h-full grid grid-cols-1 compact:grid-cols-12 relative z-20 overflow-hidden pointer-events-none">
+      <main className="app-viewport page-canvas w-full h-full grid grid-cols-1 compact:grid-cols-12 relative z-20 overflow-hidden pointer-events-none">
         {/* Paint order (all pinned to row 1 via explicit grid columns, so DOM order only
             controls stacking, not layout):
             1. RightSidebar  — bottom, so the top-stack cards paint over it
@@ -242,10 +265,9 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
           projects={projects}
           currentIndex={currentIndex}
           onGoToIndex={goToIndex}
-          onSelectProject={(project) => {
-            setSelectedProject(project);
-            showToast(`Viewing: ${project.title}`);
-          }}
+          onSelectProject={(project) =>
+            openProject(project)
+          }
         /> */}
         <CardDeck2
           projects={projects}
@@ -254,16 +276,13 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
           onGoToIndex={goToIndex}
           onSettle={settle}
           onGrab={grab}
-          onSelectProject={(project) => {
-            setSelectedProject(project);
-            showToast(`Viewing: ${project.title}`);
-          }}
+          onSelectProject={(project) =>
+            openProject(project)
+          }
         />
 
         <LeftSidebar
           activeProject={activeProject}
-          currentIndex={currentIndex}
-          totalCount={totalCount}
           activeSection={activeSection}
           onSelectSection={(section) => {
             setActiveSection(section);
@@ -282,12 +301,7 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
         onCloseMenu={() => setMenuOpen(false)}
       />
 
-      {/* Interactive Project Detail Modal */}
-      <ProjectModal
-        project={selectedProject}
-        onClose={() => setSelectedProject(null)}
-      />
-
+      
       {/* Interactive Section Modals (About, Playground, Contact) */}
       <SectionModal
         section={activeSection}
@@ -296,6 +310,7 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
 
       {/* Toast Notification */}
       <Toast message={toastMessage} />
+
     </div>
   );
 }

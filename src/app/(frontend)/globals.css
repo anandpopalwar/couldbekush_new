@@ -28,6 +28,9 @@
   --color-invert: 255 255 255;
 
   /* Accents */
+  /* The site's red-orange. Nothing is set in it at the moment — the case study
+     names went to ink and to the inverted blend — but it stays as the accent. */
+  --color-accent: 255 74 47;
   --color-accent-dot: 43 43 43;
   --color-grain: 0 0 0;
 
@@ -39,8 +42,59 @@
 
   /* Selected-work counter — the numeral rides Google Sans Flex's width axis */
   --counter-size: 7rem;
-  --counter-width: 138; /* wdth, range 25–151 (100 = normal) */
-  --counter-opsz: 144; /* max optical size; what auto picks at this size anyway */
+  --counter-weight: 550; /* wght, range 1-1000 (400 = regular) */
+  --counter-width: 120; /* wdth, range 25–151 (100 = normal) */
+  --counter-opsz: 144;
+
+  /* Project names — the case study title and the next project's. Same three
+     axes as the counter above, at the same values, so the two read as one
+     piece of lettering. Kept as their own tokens rather than pointing at the
+     --counter-* set, so the deck's numeral and the project names can still be
+     tuned apart. */
+  --title-weight: 550; /* wght; overrides any font-* weight class */
+  --title-width: 120; /* wdth */
+  --title-opsz: 144; /* the display cut */
+
+  /* The project name across the foot of a case study — fluid, so it always
+     spans the viewport the way the counter spans the deck. */
+  --project-title-size: 5.75vw; /* max optical size; what auto picks at this size anyway */
+
+  /* The next project's name, on its own full-height screen. Fluid like the
+     one above, but sized to span roughly three quarters of the viewport for a
+     title of the length these run to — "WON J. YOU STUDIOS" is the longest.
+     Down from 7vw now that .title-wide runs the name at wdth 120: the extra
+     width buys back what the smaller size gives up, and nowrap leaves no
+     margin for error. */
+  --next-title-size: 6vw;
+
+  /* The destination's name on the covering slide, between the two routes.
+     Matched to the one it hands over to, so the name doesn't resize as the
+     slide clears off it. */
+  --transition-title-size: 6vw;
+
+  /* Case study shots — the work column is sized and centred on the *viewport*,
+     not on its grid track. The rail is fixed and the minimap is pushed to the
+     right edge, so neither one moves the work off centre.
+     The reference layout measures 45vw; this runs 10% under it. The min() is
+     the floor that keeps it clear of the fixed rail: the rail ends at left-12
+     + w-80 = 23rem, so each gutter must stay 24rem wide — i.e. the column can
+     never exceed 100vw - 48rem. Below ~1290px that floor is what's in effect. */
+  --shot-width: min(40.5vw, 100vw - 48rem); /* 45vw reference, less 10% */
+  /* The first grid track, back-solved from that: the gutter less the
+     container's own px-12 and the 3rem column gap. */
+  --shot-lead: calc((100vw - var(--shot-width)) / 2 - 6rem);
+  /* The shots are aspect-[16/10], so the first one's height follows from its
+     width, and the page's top padding follows from that (see --shot-top).
+     max() keeps the old 7rem as a floor, so on a short window the shot
+     sits below the header rather than being pushed off the top. */
+  --shot-height: calc(var(--shot-width) / 1.6);
+  /* Centred, then nudged down: dead centre reads as floating, and the page
+     wants a little more air above the first shot than below it. */
+  --shot-drop: 4rem;
+  --shot-top: max(
+    7rem,
+    calc((100vh - var(--shot-height)) / 2 + var(--shot-drop))
+  );
 }
 
 /* Card width steps up with the screen. Kept as overrides of the one token so
@@ -59,7 +113,7 @@
 @media (min-width: 1024px) {
   :root {
     --card-width: 320px;
-    --counter-size: 11rem;
+    --counter-size: 9.5rem;
   }
 }
 
@@ -96,7 +150,11 @@
   body {
     color: rgb(var(--color-ink));
     overflow: hidden;
-    touch-action: none;
+    /* pan-x rather than none: the horizontal axis is the browser's
+       back/forward swipe, and taking it here disables that gesture. There is
+       nothing to pan sideways anyway, so allowing it costs nothing. The deck
+       claims the vertical axis on its own stage. */
+    touch-action: pan-x;
   }
 }
 
@@ -120,7 +178,53 @@
    and can drop the browser's automatic optical sizing, which at this size would
    leave the numeral set with a small-text cut. 144 is what auto picks here. */
 .counter-numeral {
-  font-variation-settings: "wdth" var(--counter-width), "opsz" var(--counter-opsz);
+  font-variation-settings:
+    "wght" var(--counter-weight),
+    "wdth" var(--counter-width),
+    "opsz" var(--counter-opsz);
+}
+
+/* Project names, set like the counter. opsz is named alongside the other two
+   for the same reason as the counter: font-variation-settings takes over the
+   axes it lists and would otherwise drop the browser's automatic optical
+   sizing. Weight goes through the wght axis rather than a font-* class because
+   550 is between Tailwind's 500 and 600 — and because this declaration would
+   override such a class anyway, which is why elements carrying it shouldn't
+   also carry one. */
+.title-wide {
+  font-variation-settings:
+    "wght" var(--title-weight),
+    "wdth" var(--title-width),
+    "opsz" var(--title-opsz);
+}
+
+/* Fades out as its scroll container moves away from the top. HeavyScroll sets
+   --scroll-fade on itself (0 at the top, 1 once scrolled past the threshold)
+   and this inherits it, so no element needs its own scroll listener. */
+/* Both are scoped to compact+ because below it neither element is furniture
+   any more: the title is the page's heading in the flow and the rail is a block
+   of details under it, and both scroll away on their own. Fading them against
+   the scroll position would dissolve them the moment you moved. */
+@media (min-width: 1100px) {
+  .fade-on-scroll {
+    opacity: calc(1 - var(--scroll-fade, 0));
+  }
+}
+
+/* The same idea at the other end of the scroller. HeavyScroll publishes
+   --outro-fade: 0 while the last screen — the next project — is still below
+   the fold, 1 once it has come up to fill the viewport. So the rail and the
+   thumbnails clear out of the way and that screen is left on its own.
+   data-outro takes them out of the pointer path as well, since an invisible
+   rail would otherwise still swallow clicks meant for the full-screen link. */
+@media (min-width: 1100px) {
+  .fade-at-end {
+    opacity: calc(1 - var(--outro-fade, 0));
+  }
+
+  [data-outro='on'] .fade-at-end {
+    pointer-events: none;
+  }
 }
 
 /* ── Right sidebar list ────────────────────────────────────────────────────

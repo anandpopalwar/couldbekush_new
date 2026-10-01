@@ -33,12 +33,29 @@
   --color-accent: 255 74 47;
   --color-accent-dot: 43 43 43;
   --color-grain: 0 0 0;
+  /* The varnish's sheen on a flat DOM card face (.card-paper) */
+  --color-gloss: 255 250 242;
+  /* The paper stock — the sheet's underside and its edge, seen as the WebGL
+     paper curls (lib/magazinePaper.ts reads it) */
+  --color-stock: 226 222 214;
+  /* What the cards cast their shadow in */
+  --color-shadow: 20 18 14;
+  /* The DOM card face's finish (.card-paper), each 0–1: the coated stock's
+     grain, and the varnish's static sheen */
+  --paper-strength: 0.18;
+  --coat-strength: 1;
+  /* The card's drop shadow, 0–1 */
+  --card-shadow-strength: 1;
 
-  /* Card deck. The centre card is this wide × CENTER_SCALE (CardDeck2.tsx);
-     every other card is a fraction of it. One value to resize the whole deck.
-     Phones get half the width, so the stacked layout's text block below the
-     deck has room. */
+  /* Card deck. The centre card is this size × CENTER_SCALE (CardDeck2.tsx);
+     every other card is a fraction of it. Two values to resize the whole deck.
+     4:3. Phones get a narrow card, so the stacked layout's text block below
+     the deck has room; the side-by-side layout sets its own size (below). */
   --card-width: 31vw;
+  --card-height: calc(var(--card-width) * 3 / 4);
+  /* How far the deck sits off its column's centre (negative = left). The
+     work counter follows it, so the number stays centred on the card. */
+  --card-shift: 0px;
 
   /* Selected-work counter — the numeral rides Google Sans Flex's width axis */
   --counter-size: 7rem;
@@ -97,8 +114,8 @@
   );
 }
 
-/* Card width steps up with the screen. Kept as overrides of the one token so
-   the deck is resized here rather than across four utility classes. */
+/* Tokens that step up with the screen, kept as overrides here rather than
+   spread across utility classes. */
 @media (min-width: 640px) {
   :root {
     --card-width: 270px;
@@ -114,6 +131,31 @@
   :root {
     --card-width: 320px;
     --counter-size: 9.5rem;
+  }
+}
+/* The side-by-side layout (compact: and up): up to 488 × 366, grown from the
+   320 × 240 card to the left only — its right edge stays where that card's
+   was. The deck is centred in its column, so it's shifted left by half the
+   width gained; the centre card is drawn at CENTER_SCALE (CardDeck2.tsx)
+   about its own centre, so that's scaled too, or the right edge would still
+   creep out. */
+@media (min-width: 1100px) {
+  :root {
+    /* 488 × 366 from 1440px up (the wide: target); narrower screens take
+       the same share of the width, or the card would run into the left
+       rail's project details. */
+    --card-width: min(488px, 33.9vw);
+    --card-height: min(366px, 25.42vw);
+    --card-anchor-width: 320px;
+    --card-centre-scale: 1.3; /* = CENTER_SCALE */
+    /* …and then nudged back right to close a fifth of the gap to the right
+       rail. The deck's column spans 25–75% of the screen and the anchor
+       card's right edge sat anchor/2 × scale past the middle, so that gap is
+       25vw less that; a fifth of it is 5vw less a fifth of that. */
+    --card-shift: calc(
+      (var(--card-anchor-width) - var(--card-width)) / 2 * var(--card-centre-scale) +
+        5vw - var(--card-anchor-width) / 2 * var(--card-centre-scale) / 5
+    );
   }
 }
 
@@ -257,11 +299,37 @@
   font-size: calc(10px + 4px * var(--u, 0));
 }
 
+
+
 .rs-desc {
   font-size: calc(10px + 4px * var(--u, 0));
   line-height: calc(14px + 6px * var(--u, 0));
   letter-spacing: calc(-0.006em * var(--u, 0));
   font-weight: 400;
+}
+
+/* The rail's viewport dissolves at its top and bottom edges, so the outermost
+   of the five cards fades into the edge instead of running into the header
+   above it. --rs-edge-fade is how deep the fade reaches. */
+:root {
+  --rs-edge-fade: 18%;
+}
+
+.rs-edge-fade {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black var(--rs-edge-fade),
+    black calc(100% - var(--rs-edge-fade)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black var(--rs-edge-fade),
+    black calc(100% - var(--rs-edge-fade)),
+    transparent 100%
+  );
 }
 
 /* Hide standard scrollbars */
@@ -277,6 +345,64 @@
 .perspective-stage {
   perspective: 2500px;
   perspective-origin: center center;
+}
+
+/* ── Card faces ────────────────────────────────────────────────────────────
+   A card shows one of two things. Normally its sheet of paper, drawn in WebGL
+   by lib/magazinePaper.ts into the canvas inside it — artwork, flex, coating
+   and light all come from there, and the card element itself draws nothing.
+   Until that sheet has been drawn, or where WebGL isn't available, it shows
+   its DOM face: the same artwork, flat, under .card-paper's static finish.
+   CardDeck2 sets data-paper on the card once its sheet is up. */
+.deck-card[data-paper] [data-face] {
+  visibility: hidden;
+}
+
+/* The DOM face's finish: the photo printed on coated stock under a clear
+   varnish. Static, rasterised once, never repainted per frame.
+     ::before  the coated stock — a grain so fine and faint it only keeps the
+               print from looking like a screen.
+     ::after   the varnish — a soft sheen falling from the top.
+   --paper-strength scales the grain, --coat-strength the varnish. */
+.card-paper {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+.card-paper::before,
+.card-paper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.card-paper::before {
+  opacity: var(--paper-strength);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.8' numOctaves='1' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0.8 -0.2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23c)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+.card-paper::after {
+  opacity: var(--coat-strength);
+  background: linear-gradient(
+    to bottom,
+    rgb(var(--color-gloss) / 0.1),
+    transparent 45%
+  );
+}
+
+/* ── Card shadow ───────────────────────────────────────────────────────────
+   For the flat DOM face only. A card drawn as paper casts its shadow in WebGL
+   (lib/magazinePaperShader.ts), from the sheet's footprint as it flexes: a
+   box-shadow here stays fixed to the card's rest rectangle, and as the paper
+   curled away from it the uncovered rectangle showed as a pale ghost card
+   ringed by its shadow — the outline seen around the cards while scrolling. */
+.card-edge:not([data-paper]) {
+  border-radius: 0.125rem;
+  box-shadow:
+    0 1px 2px rgb(var(--color-shadow) / calc(0.18 * var(--card-shadow-strength))),
+    0 10px 24px -8px rgb(var(--color-shadow) / calc(0.3 * var(--card-shadow-strength))),
+    0 28px 56px -20px rgb(var(--color-shadow) / calc(0.32 * var(--card-shadow-strength)));
 }
 
 .card-deck-shadow {

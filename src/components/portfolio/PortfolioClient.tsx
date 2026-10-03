@@ -5,8 +5,6 @@ import { Project, NavSection } from '@/types/portfolio';
 import { useAudioFeedback } from '@/hooks/useAudioFeedback';
 import { useDeckScroll } from '@/hooks/useDeckScroll';
 import { GrainOverlay } from '@/components/ui/GrainOverlay';
-import { Toast } from '@/components/ui/Toast';
-import { TopHeader } from '@/components/portfolio/TopHeader';
 import { LeftSidebar } from '@/components/portfolio/LeftSidebar';
 import { CardDeck } from '@/components/portfolio/CardDeck';
 import { RightSidebar } from '@/components/portfolio/RightSidebar';
@@ -30,14 +28,11 @@ const STEP_COOLDOWN_MS = 110;
 export function PortfolioClient({ projects }: { projects: Project[] }) {
   const totalCount = projects.length;
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [activeSection, setActiveSection] = useState<NavSection>('work');
   // Mobile menu. Held here so the deck's input handlers can ignore wheel and
   // key events while the full-screen panel is open.
   const [menuOpen, setMenuOpen] = useState(false);
-
-  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // The deck's position in card units — the single source of truth for where it
   // is. Integers centre a card; anything between means the deck is mid-scroll.
@@ -50,7 +45,7 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
 
   const router = useRouter();
   const { slideTo } = useRouteSlide();
-  const { audioEnabled, toggleAudio, playDeckSound } = useAudioFeedback();
+  const { playDeckSound } = useAudioFeedback();
 
   // The slide, its timings and its panel all live in the template, which owns
   // both halves of the transition — see useRouteSlide.
@@ -60,14 +55,6 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
     },
     [slideTo],
   );
-
-  const showToast = useCallback((msg: string) => {
-    setToastMessage(msg);
-    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    toastTimeoutRef.current = setTimeout(() => {
-      setToastMessage(null);
-    }, 1800);
-  }, []);
 
   const lastTriggerTimeRef = useRef<number>(0);
 
@@ -134,17 +121,6 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
         <div ref={deckScroll.spacerRef} />
       </div>
 
-      <TopHeader
-        audioEnabled={audioEnabled}
-        onToggleAudio={() => {
-          toggleAudio();
-          showToast(!audioEnabled ? 'UI Audio Enabled' : 'UI Audio Muted');
-        }}
-        onSelectSection={(section) => {
-          setActiveSection(section);
-        }}
-      />
-
       {/* Main Viewport — carries the page background so the counter's mix-blend-difference
           has a real backdrop to invert against (main is a z-20 stacking context, so a
           transparent main would blend against nothing and render the number solid white). */}
@@ -193,7 +169,6 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
       {/* Stacked layout below 1100px, where both sidebars are hidden. */}
       <MobileChrome
         activeProject={activeProject}
-        totalCount={totalCount}
         activeSection={activeSection}
         onSelectSection={setActiveSection}
         menuOpen={menuOpen}
@@ -207,9 +182,6 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
         section={activeSection}
         onClose={() => setActiveSection('work')}
       />
-
-      {/* Toast Notification */}
-      <Toast message={toastMessage} />
 
     </div>
   );

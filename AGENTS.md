@@ -37,7 +37,6 @@ src/
 │   │   ├── ProjectChrome.tsx # The site's furniture on a case study
 │   │   ├── HeavyScroll.tsx # Weighted scroller; publishes the two fade vars
 │   │   ├── PageEnter.tsx   # Step 4 of the transition — the arrival bounce
-│   │   ├── TopHeader.tsx   # Brand mark, nav, audio toggle, inquiries
 │   │   ├── LeftSidebar.tsx # Menu nav, project metadata, counter
 │   │   ├── CardDeck.tsx    # Diagonal 3D card stack (superseded by CardDeck2)
 │   │   ├── CardDeck2.tsx   # Vertical conveyor deck — the one in use
@@ -50,7 +49,7 @@ src/
 │   │   └── SectionModal.tsx# About, Playground, Contact modals
 │   └── ui/
 │       ├── GrainOverlay.tsx # Film grain texture overlay
-│       └── Toast.tsx        # Toast notifications
+│       └── Toast.tsx        # Toast notifications (nothing raises one now)
 ├── data/
 │   └── projects.ts         # 8 portfolio projects with metadata
 ├── lib/
@@ -274,7 +273,11 @@ Invisible Arc (bottom half): Top cards → Bottom cards (instant, opacity 0)
 
 ### LeftSidebar.tsx
 - Navigation menu (WORK, ABOUT, PLAYGROUND, CONTACT)
-- Project metadata grid (Role, then Launch below it; Recognition is not shown)
+- Project metadata (`rail-left-meta`) — Role, then Launch, as a ruled list in
+  the bottom-left corner: a rule above each row, the label on the left, the
+  value right-aligned. Anchored by its foot, so a role that wraps grows the
+  block upward. Recognition is not shown. The case study's rail is *not* set
+  this way — it keeps its unruled label/value grid.
 - Large project counter — the number alone, centred on the **card** via
   `left-[var(--card-shift)] w-screen flex justify-center` — the aside is only
   3 of 12 columns but starts at the viewport edge, and `--card-shift` is how
@@ -291,6 +294,8 @@ Invisible Arc (bottom half): Top cards → Bottom cards (instant, opacity 0)
 - Paper flip/page turn sounds
 - Bandpass filtered noise + triangle oscillator
 - Direction-aware frequency sweeps
+- Nothing switches it on at the moment: it starts off, and the audio toggle
+  went with the header. `playDeckSound` is still called and does nothing.
 
 ## The case study route
 
@@ -312,6 +317,11 @@ carries its own scroller rather than fighting that rule.
 - **Below `compact` the page restructures**: the scroller becomes
   `flex flex-col` purely so the title can be `order-first` while staying last in
   the DOM, the rail and minimap return to the flow, and the minimap is hidden.
+- **The title is inverted** against the page and the shots with
+  `mix-blend-difference`, like the deck's counter. The blend sits on
+  `case-study-title` itself, not on the `h1`: `sticky` + `z-20` makes the
+  wrapper a stacking context, and a blend nested inside it would be isolated
+  from the shots and render solid white.
 
 ### The two fades
 `HeavyScroll` publishes two custom properties on the scroller and everything
@@ -385,7 +395,8 @@ The source of truth is `:root` in `src/app/(frontend)/globals.css`.
   `--card-shift` moves `deck-frame` (by CSS `left`, since gsap owns its
   transform) so the centre card's right edge stays put; the shift is scaled
   by `--card-centre-scale`, which must match `CENTER_SCALE`. Below 1100 the
-  stacked layout keeps the small 4:3 steps. The shift then closes a fifth of
+  stacked layout keeps the small 4:3 steps; under 640 the card is `46.5vw`,
+  which puts the centre card at about 60% of a phone's width. The shift then closes a fifth of
   the gap to the right rail (`+ 5vw - anchor/2 × scale / 5`: the deck's
   column spans 25–75% of the screen). The work counter and `deck-hint` follow
   `--card-shift`, so both stay centred on the card.
@@ -447,8 +458,8 @@ strings against source files.
 | Region | Markers |
 |--------|---------|
 | Shell | `app-shell`, `app-viewport`, `route-content`, `route-transition` |
-| Chrome | `chrome-header`, `chrome-contact`, `chrome-status`, `chrome-audio`, `chrome-brand`, `chrome-nav` |
-| Left rail | `rail-left`, `rail-left-nav`, `rail-left-meta`, `work-counter`, `scroll-hint` |
+| Chrome | `chrome-nav` |
+| Left rail | `rail-left`, `rail-left-nav`, `rail-left-meta`, `work-counter` |
 | Right rail | `rail-right`, `rail-right-viewport`, `rail-right-track`, `rail-right-slot`, `rail-right-swatches`, `rail-right-showreel` |
 | Deck | `deck-scroller`, `deck-stage`, `deck-frame`, `deck-card`, `deck-hint` |
 | Below 1100 | `menu-toggle`, `mobile-brand`, `mobile-counter`, `mobile-detail`, `mobile-swatches`, `mobile-menu`, `mobile-menu-nav`, `mobile-menu-footer` |
@@ -480,8 +491,18 @@ custom property.
 
 Below `compact` the whole layout changes: both sidebars are hidden and
 `MobileChrome` renders the stacked variant instead — deck, project detail
-beneath it, page number under the menu button. The header's contact line also
-collapses to a paper-plane icon there.
+beneath it, then the swatches, then the page number (the numeral alone, no
+total), centred at the foot.
+
+There is no header at any width. The contact line, "Working globally", the
+audio toggle and the scroll hint were removed, and `TopHeader` with them. The
+address now appears only in the Contact panel and in the mobile menu's
+footer.
+
+`body` is `h-dvh`, not `h-screen`. On a phone `100vh` is the height with the
+browser's toolbar hidden, so while the bar was showing the page was taller
+than what was visible and the deck's centre sat below the real middle. The
+deck re-measures on `resize`, which fires as the bar comes and goes.
 
 Typography breakpoints on the reference use different boundaries again
 (display 23/29/40/60px stepping at 1200/1440/1920; body at 1100/1800). Not

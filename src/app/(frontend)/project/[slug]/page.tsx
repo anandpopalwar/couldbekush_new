@@ -241,11 +241,12 @@ export default async function ProjectPage({ params }: Params) {
           flow above the details, and it scrolls away with everything else
           (`fade-on-scroll` is scoped to compact+ in globals.css for exactly
           that reason, or it would dissolve the moment you moved).
-          Flat ink rather than the counter's inverted blend: this one passes
-          over the work as you scroll, and a difference blend turned it into
-          whatever the image underneath happened to be. */}
-      <div className="case-study-title fade-on-scroll order-first compact:order-none static compact:sticky bottom-0 z-20 pointer-events-none px-6 pt-56 pb-0 text-center compact:px-12 compact:pt-0 compact:pb-2 compact:text-right">
-        <h1 className="title-wide text-[length:var(--project-title-size)] leading-[0.78] uppercase tracking-tight text-ink">
+          Inverted against the page and the work, like the deck's counter. The
+          blend sits on this element, not on the h1: sticky + z-20 makes this a
+          stacking context, and a blend nested inside it would be isolated from
+          the shots and render solid white. */}
+      <div className="case-study-title fade-on-scroll order-first compact:order-none static compact:sticky bottom-0 z-20 pointer-events-none px-6 pt-56 pb-0 text-center compact:px-12 compact:pt-0 compact:pb-2 compact:text-right text-invert mix-blend-difference">
+        <h1 className="title-wide text-[length:var(--project-title-size)] leading-[0.78] uppercase tracking-tight">
           {project.title}
         </h1>
       </div>

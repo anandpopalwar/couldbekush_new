@@ -49,9 +49,11 @@
 
   /* Card deck. The centre card is this size × CENTER_SCALE (CardDeck2.tsx);
      every other card is a fraction of it. Two values to resize the whole deck.
-     4:3. Phones get a narrow card, so the stacked layout's text block below
-     the deck has room; the side-by-side layout sets its own size (below). */
-  --card-width: 31vw;
+     4:3. On phones the centre card is about 60% of the screen's width — 1.5×
+     the 31vw it started at — which leaves the stacked layout's text block
+     below the deck just enough room; the side-by-side layout sets its own
+     size (below). */
+  --card-width: 46.5vw;
   --card-height: calc(var(--card-width) * 3 / 4);
   /* How far the deck sits off its column's centre (negative = left). The
      work counter follows it, so the number stays centred on the card. */

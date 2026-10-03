@@ -54,24 +54,29 @@ export function LeftSidebar({
         </nav>
       </div>
 
-      {/* Dynamic Project Metadata — anchored at a FIXED vertical position so the Role/Launch
-          labels never shift with content length. Launch sits directly below Role. */}
-      {/* Label column is `auto`, not a fixed 5rem: a fixed track left a short
-          label like "Role" stranded far from its value. Role and Launch share
-          one grid so `auto` resolves to the same width for both and their
-          values line up.
+      {/* Dynamic Project Metadata — a ruled list in the bottom-left corner:
+          each row opens with a rule, label on the left, value on the right.
+          Anchored by its foot, so a role that wraps grows the block upward.
 
-          min-w-0 on the value matters — a grid item defaults to min-width:auto,
-          so a long word (Architecture) would overflow its track. */}
+          min-w-0 on the value matters — a flex item defaults to min-width:auto,
+          so a long word (Architecture) would overflow its row. */}
       <div
         ref={blurRef}
-        className="rail-left-meta absolute top-[43%] left-5 right-6 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 items-start content-start"
+        className="rail-left-meta absolute bottom-6 left-5 right-6 flex flex-col"
       >
-        <span className="text-label-xs text-inkMuted">Role</span>
-        <p className="text-label-xs text-ink min-w-0">{activeProject.role}</p>
+        <div className="flex justify-between items-start gap-x-3 border-t border-ink py-2">
+          <span className="text-label-xs text-inkMuted">Role</span>
+          <p className="text-label-xs text-ink min-w-0 text-right">
+            {activeProject.role}
+          </p>
+        </div>
 
-        <span className="text-label-xs text-inkMuted">Launch</span>
-        <p className="text-label-xs text-ink min-w-0">{activeProject.launch}</p>
+        <div className="flex justify-between items-start gap-x-3 border-t border-ink py-2">
+          <span className="text-label-xs text-inkMuted">Launch</span>
+          <p className="text-label-xs text-ink min-w-0 text-right">
+            {activeProject.launch}
+          </p>
+        </div>
       </div>
 
       {/* Bottom selected work counter — huge number overlapping the card deck (z above cards,
@@ -92,11 +97,6 @@ export function LeftSidebar({
         >
           {activeProject.id}
         </span>
-      </div>
-
-      {/* Scroll hint — bottom, inset from the left edge to match the right-side padding */}
-      <div className="scroll-hint absolute bottom-6 left-5 text-micro-md tracking-wide text-inkMuted">
-        Scroll
       </div>
     </aside>
   );

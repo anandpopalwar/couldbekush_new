@@ -56,6 +56,16 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
     [slideTo],
   );
 
+  // About is a page of its own, reached through the same slide as a case
+  // study. Playground and Contact are still panels over the deck.
+  const selectSection = useCallback(
+    (section: NavSection) => {
+      if (section === 'about') slideTo('/about', 'About');
+      else setActiveSection(section);
+    },
+    [slideTo],
+  );
+
   const lastTriggerTimeRef = useRef<number>(0);
 
   // Jump to a specific project by the shortest way round the deck.
@@ -160,9 +170,7 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
         <LeftSidebar
           activeProject={activeProject}
           activeSection={activeSection}
-          onSelectSection={(section) => {
-            setActiveSection(section);
-          }}
+          onSelectSection={selectSection}
         />
       </main>
 
@@ -170,14 +178,14 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
       <MobileChrome
         activeProject={activeProject}
         activeSection={activeSection}
-        onSelectSection={setActiveSection}
+        onSelectSection={selectSection}
         menuOpen={menuOpen}
         onOpenMenu={() => setMenuOpen(true)}
         onCloseMenu={() => setMenuOpen(false)}
       />
 
       
-      {/* Interactive Section Modals (About, Playground, Contact) */}
+      {/* Interactive Section Modals (Playground, Contact) */}
       <SectionModal
         section={activeSection}
         onClose={() => setActiveSection('work')}

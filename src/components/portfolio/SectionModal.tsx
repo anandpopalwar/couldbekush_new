@@ -3,7 +3,6 @@
 import {
   X,
   Mail,
-  MapPin,
   ArrowUpRight,
   Github,
   Twitter,
@@ -42,61 +41,6 @@ export function SectionModal({ section, onClose }: SectionModalProps) {
 
         {/* Content per Section */}
         <div className="p-6 md:p-8 space-y-6 overflow-y-auto max-h-[75vh]">
-          {section === "about" && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl md:text-3xl font-extrabold uppercase tracking-tight text-ink mb-3">
-                  Design Direction & Digital Architecture
-                </h2>
-                <p className="text-paragraph-sm leading-relaxed text-ink/80">
-                  couldbekush is an independent design direction practice
-                  operating at the intersection of haute digital aesthetics,
-                  kinetic interaction design, and high-performance WebGL
-                  frontend engineering.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 pt-2 border-t border-ink/10 font-mono text-paragraph-xs">
-                <div>
-                  <span className="text-inkMuted block text-micro-sm uppercase tracking-wider mb-1">
-                    Location
-                  </span>
-                  <span className="font-semibold text-ink flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-inkMuted" /> Saigon / Remote
-                  </span>
-                </div>
-                <div>
-                  <span className="text-inkMuted block text-micro-sm uppercase tracking-wider mb-1">
-                    Focus
-                  </span>
-                  <span className="font-semibold text-ink">
-                    3D Web / Brand Systems
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-3 pt-2">
-                <h3 className="text-paragraph-xs font-mono tracking-widest text-inkMuted uppercase">
-                  Awards & Accolades
-                </h3>
-                <ul className="space-y-1.5 font-mono text-paragraph-xs text-ink/90">
-                  <li className="flex justify-between border-b border-ink/5 pb-1">
-                    <span>Awwwards Site of the Year Nominee</span>
-                    <span className="text-inkMuted">2023</span>
-                  </li>
-                  <li className="flex justify-between border-b border-ink/5 pb-1">
-                    <span>FWA of the Month Winner</span>
-                    <span className="text-inkMuted">2022</span>
-                  </li>
-                  <li className="flex justify-between border-b border-ink/5 pb-1">
-                    <span>CSSDA Studio of the Year finalist</span>
-                    <span className="text-inkMuted">2021</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          )}
-
           {section === "playground" && (
             <div className="space-y-6">
               <div>

@@ -129,6 +129,11 @@ export default function Template({ children }: { children: React.ReactNode }) {
 
   const slideTo = useCallback(
     (href: string, nextLabel: string) => {
+      // Already there. Pushing the current path neither remounts this template
+      // nor changes `pathname`, so nothing would ever carry the slide back
+      // down — the page would stay covered.
+      if (href === pathname) return;
+
       if (pendingHrefRef.current || prefersReducedMotion()) {
         router.push(href);
         return;
@@ -146,7 +151,7 @@ export default function Template({ children }: { children: React.ReactNode }) {
 
       window.setTimeout(go, FALLBACK_MS);
     },
-    [go, router],
+    [go, router, pathname],
   );
 
   const covered =

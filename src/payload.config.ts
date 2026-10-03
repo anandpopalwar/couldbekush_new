@@ -12,6 +12,8 @@ import { Media } from "./collections/Media";
 import { Categories } from "./collections/Categories";
 import { Projects } from "./collections/Projects";
 import { Posts } from "./collections/Posts";
+import { Magazines } from "./collections/Magazines";
+import { MagazineLayers } from "./collections/MagazineLayers";
 
 // On Windows, sharp's cache keeps the source image file open, so Payload's
 // write-back of the WebP-converted upload to the same temp path fails with
@@ -35,6 +37,13 @@ plugins.push(
         prefix: "media",
         // Serve files from the public Blob URL instead of proxying every image
         // through Payload's /api/media/file route.
+        disablePayloadAccessControl: true,
+      },
+      // The About page's magazine layers. Stored as uploaded, and read by the
+      // viewer straight from Blob — which answers any origin, so the layers
+      // can be drawn into a canvas and read back.
+      magazineLayers: {
+        prefix: "magazine-layers",
         disablePayloadAccessControl: true,
       },
     },
@@ -61,7 +70,7 @@ export default buildConfig({
   admin: {
     user: Users.slug,
   },
-  collections: [Users, Media, Categories, Projects, Posts],
+  collections: [Users, Media, Categories, Projects, Posts, Magazines, MagazineLayers],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || "",
   typescript: {

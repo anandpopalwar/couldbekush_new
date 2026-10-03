@@ -1,51 +1,96 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { FOIL_CARDS, cardFontsReady, flat } from '@/lib/foilCards';
-import type { FoilCardScene } from '@/lib/foilCardScene';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FOIL_CARDS, cardFontsReady } from '@/lib/foilCards';
+import { drawnCard, flat, uploadedCard } from '@/lib/foilLayers';
+import type { FoilCardScene, FoilLayout, FoilSceneFrame } from '@/lib/foilCardScene';
+import type { MagazineData } from '@/types/magazines';
+import { useTransitionBlur } from '@/hooks/useTransitionBlur';
 
 /**
- * The About page's card viewer: a folded hot-foil card on a table, a rack of
- * the others beneath it, and the selected card's details beside it.
+ * The About page: the magazines — hot-foil cards — on a diagonal track, and
+ * the front one's details laid over it.
  *
- * Renders two grid items for the page to place — the stage column and the
- * details. The card itself is lib/foilCardScene.ts, which appends its own
- * canvas to the stage and runs its own loop; this component only tells it
- * what was asked for and labels the buttons from what it reports back. Where
- * WebGL isn't available the same designs are drawn flat instead, and
- * everything but turning the card over still works.
+ * They come from the CMS, as image layers (see lib/foilLayers.ts); with none
+ * published, the five built-in ones, drawn in code, stand in.
+ *
+ * Two layers. The stage fills the page and holds the track — drawn by
+ * lib/foilCardScene.ts, which appends its own canvas and runs its own loop.
+ * Over it sits the UI, click-through: one note centred under the front card
+ * saying what it is, and nothing else. There are no buttons — the track is
+ * moved by the wheel, a drag or the arrow keys, and the front card opens on a
+ * tap. This component labels itself from what the scene reports back, and
+ * measures where the UI leaves room, since the scene frames the front card in
+ * that space.
+ *
+ * Where WebGL isn't available the front card is drawn flat instead.
  */
 
-// Texture width for the 3D card. A phone shows it smaller and bakes it slower.
-const TEXTURE_WIDTH = { fine: 1024, coarse: 768 };
-// The rack's thumbnails are drawn at twice the 46 × 64 they're shown at.
-const THUMB_WIDTH = 92;
-const THUMB_HEIGHT = 128;
-// The flat stand-in for the stage, px wide.
+// Texture width for the 3D cards — all five are on the track at once.
+const TEXTURE_WIDTH = 768;
+// The flat stand-in for the track, px wide.
 const FLAT_WIDTH = 640;
+// Room left around the front card, px: under the top UI, and between an open
+// card and the screen's edge.
+const BAND_CLEAR = 6;
+const EDGE_CLEAR = 10;
 
-const RULED_ROW = 'flex justify-between items-start gap-x-3 border-t border-ink py-2';
 const MICRO_LABEL = 'font-mono text-micro-md tracking-widest uppercase';
+// The note's main line. The line height is marked important: a text-* token
+// inside a breakpoint carries its own and would beat a plain leading-* class.
+const NOTE_TEXT =
+  'font-display text-label-md compact:text-title-h5 wide:text-title-h4 [@media(max-height:640px)]:text-title-h6 uppercase !leading-none tracking-tight text-balance';
 
-const pad = (n: number) => String(n).padStart(2, '0');
 
-export function FoilCards() {
+export function FoilCards({ magazines }: { magazines: MagazineData[] }) {
+  // Magazines whose layers would not load are left off the track, by name.
+  const [skipped, setSkipped] = useState<string[]>([]);
+  // The CMS's magazines, or the built-in ones if there are none to show.
+  const cards = useMemo(() => {
+    const uploaded = magazines.filter((magazine) => !skipped.includes(magazine.name));
+    return uploaded.length ? uploaded.map(uploadedCard) : FOIL_CARDS.map(drawnCard);
+  }, [magazines, skipped]);
+
   const [index, setIndex] = useState(0);
   const [open, setOpen] = useState(false);
-  const [turned, setTurned] = useState(false);
-  // 'pressing' until the first card is up; 'flat' where there is no WebGL.
+  // 'pressing' until the front card is up; 'flat' where there is no WebGL.
   const [mode, setMode] = useState<'pressing' | 'lit' | 'flat'>('pressing');
-  // The lettering's faces have loaded, so the flat renders can be drawn.
+  // The lettering's face has loaded, so a flat render can be drawn.
   const [lettered, setLettered] = useState(false);
 
   const stageRef = useRef<HTMLDivElement>(null);
   const flatRef = useRef<HTMLCanvasElement>(null);
-  const thumbsRef = useRef<(HTMLCanvasElement | null)[]>([]);
+  const topRef = useRef<HTMLSpanElement>(null);
+  const notesRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<FoilCardScene | null>(null);
-  const indexRef = useRef(index);
-  useEffect(() => {
-    indexRef.current = index;
-  }, [index]);
+  const indexRef = useRef(0);
+
+  const show = useCallback((next: number, nextOpen: boolean) => {
+    if (next !== indexRef.current) {
+      indexRef.current = next;
+      setIndex(next);
+    }
+    setOpen(nextOpen);
+  }, []);
+
+  // Where the UI leaves room for the front card. Read from layout boxes
+  // (offset*), which a transform on an ancestor can't shift.
+  const measure = useCallback((): FoilSceneFrame => {
+    const stage = stageRef.current;
+    const top = topRef.current;
+    const notes = notesRef.current;
+    if (!stage || !top || !notes) {
+      return { top: 0, bottom: window.innerHeight, room: window.innerWidth / 2, layout: 'phone' };
+    }
+    return {
+      // The marker's classes set --layout per breakpoint, so the breakpoints
+      // themselves aren't repeated here.
+      layout: (getComputedStyle(top).getPropertyValue('--layout').trim() || 'wide') as FoilLayout,
+      top: top.offsetTop + BAND_CLEAR,
+      bottom: notes.offsetTop,
+      room: stage.clientWidth / 2 - EDGE_CLEAR,
+    };
+  }, []);
 
   // Bring the scene up, client-side, once the lettering can be drawn.
   useEffect(() => {
@@ -53,28 +98,28 @@ export function FoilCards() {
     if (!stage) return;
     let cancelled = false;
     let scene: FoilCardScene | null = null;
+    // A shorter track than the last one: start it from the first magazine.
+    if (indexRef.current >= cards.length) {
+      indexRef.current = 0;
+      setIndex(0);
+    }
+    setMode('pressing');
 
     (async () => {
       await cardFontsReady();
       if (cancelled) return;
       setLettered(true);
 
-      const tokens = getComputedStyle(document.documentElement);
       const { FoilCardScene } = await import('@/lib/foilCardScene');
       const created = await FoilCardScene.create(stage, {
-        cards: FOIL_CARDS,
+        cards,
         index: indexRef.current,
-        textureWidth: window.matchMedia('(pointer: coarse)').matches
-          ? TEXTURE_WIDTH.coarse
-          : TEXTURE_WIDTH.fine,
-        shadow: tokens.getPropertyValue('--color-shadow'),
-        shadowStrength: Number(tokens.getPropertyValue('--card-shadow-strength')) || 1,
-        onState: (state) => {
-          setIndex(state.index);
-          setOpen(state.open);
-          setTurned(state.turned);
-        },
+        textureWidth: TEXTURE_WIDTH,
+        frame: measure,
+        onState: (state) => show(state.index, state.open),
         onReady: () => setMode('lit'),
+        // The track is rebuilt without it.
+        onSkip: (skip) => setSkipped((names) => [...names, cards[skip].name]),
       });
       if (cancelled) {
         created?.dispose();
@@ -92,19 +137,7 @@ export function FoilCards() {
       sceneRef.current = null;
       scene?.dispose();
     };
-  }, []);
-
-  const select = useCallback((next: number, dir: 1 | -1) => {
-    const count = FOIL_CARDS.length;
-    const i = ((next % count) + count) % count;
-    const scene = sceneRef.current;
-    if (scene) {
-      scene.select(i, dir);
-      return;
-    }
-    setIndex(i);
-    setOpen(false);
-  }, []);
+  }, [cards, measure, show]);
 
   const toggleOpen = useCallback(() => {
     const scene = sceneRef.current;
@@ -112,187 +145,121 @@ export function FoilCards() {
     else setOpen((was) => !was);
   }, []);
 
-  // Left and right walk the rack from anywhere on the page.
+  // The arrows walk the track from anywhere on the page; Escape closes.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      const scene = sceneRef.current;
+      if (e.key === 'Escape') {
+        if (scene) scene.close();
+        else setOpen(false);
+        return;
+      }
+      const forward = e.key === 'ArrowRight' || e.key === 'ArrowUp';
+      const back = e.key === 'ArrowLeft' || e.key === 'ArrowDown';
+      if (!forward && !back) return;
       e.preventDefault();
-      const dir = e.key === 'ArrowRight' ? 1 : -1;
-      select(indexRef.current + dir, dir);
+      const direction = forward ? 1 : -1;
+      if (scene) scene.stepBy(direction);
+      else show((indexRef.current + direction + cards.length) % cards.length, false);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [select]);
+  }, [cards, show]);
 
-  // The rack's thumbnails, once.
-  useEffect(() => {
-    if (!lettered) return;
-    FOIL_CARDS.forEach((card, i) => {
-      thumbsRef.current[i]?.getContext('2d')?.drawImage(flat(card, THUMB_WIDTH, 'front'), 0, 0);
-    });
-  }, [lettered]);
-
-  // Without WebGL the stage shows the card flat — its cover, or its inside.
+  // Without WebGL the stage shows the front card flat — its cover, or its inside.
   useEffect(() => {
     const canvas = flatRef.current;
     if (mode !== 'flat' || !lettered || !canvas) return;
-    const drawn = flat(FOIL_CARDS[index], FLAT_WIDTH, open ? 'inside' : 'front');
-    canvas.width = drawn.width;
-    canvas.height = drawn.height;
-    canvas.getContext('2d')?.drawImage(drawn, 0, 0);
-  }, [mode, lettered, index, open]);
+    let stale = false;
+    flat(cards[index] ?? cards[0], FLAT_WIDTH, open ? 'inside' : 'front')
+      .then((drawn) => {
+        if (stale) return;
+        canvas.width = drawn.width;
+        canvas.height = drawn.height;
+        canvas.getContext('2d')?.drawImage(drawn, 0, 0);
+      })
+      // A layer that won't load leaves the stand-in blank; the 3D path, which
+      // can drop the magazine, isn't running here.
+      .catch(() => {});
+    return () => {
+      stale = true;
+    };
+  }, [mode, lettered, cards, index, open]);
 
-  const card = FOIL_CARDS[index];
-  const specs: [string, React.ReactNode][] = [
-    ['Stock', card.stockName],
-    [
-      'Foil',
-      <>
-        <span
-          aria-hidden
-          className="inline-block w-3.5 h-3.5 rounded-[3px] mr-2 align-[-3px]"
-          style={{ backgroundImage: `linear-gradient(135deg, ${card.grad.join(',')})` }}
-        />
-        {card.foilName}, hot-foil stamped
-      </>,
-    ],
-    ['Size', '5 × 7 in, folded'],
-    ['Finish', card.finish],
-    ['Inside', card.foilMessage ? 'Message in foil' : 'Message in ink'],
-    ['Envelope', card.envelope],
-  ];
+  const card = cards[index] ?? cards[0];
+  // The note blurs while the track moves between magazines and sharpens once
+  // it settles — the same blink as the deck's text, from the same hook.
+  const blurRef = useTransitionBlur(card.name);
 
   return (
     <>
-      <section className="about-stage-column flex flex-col min-w-0 min-h-0 compact:col-start-4 compact:col-span-6 compact:row-start-1 compact:h-full">
-        {/* pan-y: a sideways drag turns the card, an up-and-down one still
-            scrolls the page on a phone. */}
-        <div
-          ref={stageRef}
-          tabIndex={0}
-          role="group"
-          aria-label="Card viewer. Press Enter to open or close the card."
-          onKeyDown={(e) => {
-            if (e.key !== 'Enter' && e.key !== ' ') return;
-            e.preventDefault();
-            toggleOpen();
-          }}
-          className="about-stage relative h-[min(60svh,540px)] min-h-[320px] compact:h-auto compact:min-h-0 compact:flex-1 cursor-grab active:cursor-grabbing [touch-action:pan-y] outline-none focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-ink"
-        >
-          {mode === 'pressing' && (
-            <p className={`absolute inset-0 grid place-items-center pointer-events-none text-inkMuted ${MICRO_LABEL}`}>
-              Pressing foil…
-            </p>
-          )}
-          {mode === 'flat' && (
-            <canvas
-              ref={flatRef}
-              role="img"
-              aria-label={`${card.name}, ${open ? 'inside' : 'front'}`}
-              className="card-edge absolute inset-0 m-auto max-w-[82%] max-h-[82%]"
-            />
-          )}
-        </div>
-
-        <p className={`about-hint px-6 text-center text-inkMuted ${MICRO_LABEL}`}>
-          {mode === 'flat'
-            ? 'Use the arrows to browse · Open card shows the inside'
-            : 'Move to catch the light · Drag to turn · Tap the card to open it'}
-        </p>
-
-        <nav
-          aria-label="Choose a card"
-          className="about-rack flex items-center justify-center gap-x-2.5 min-w-0 pt-4 pb-2 compact:pb-6"
-        >
-          <button
-            type="button"
-            aria-label="Previous card"
-            onClick={() => select(index - 1, -1)}
-            className="grid place-items-center flex-none w-9 h-9 rounded-full border border-ink/20 text-label-md text-ink hover:border-ink transition-colors"
-          >
-            ←
-          </button>
-          <div className="no-scrollbar flex gap-x-3.5 min-w-0 overflow-x-auto px-1 py-2">
-            {FOIL_CARDS.map((item, i) => {
-              const active = i === index;
-              return (
-                <button
-                  key={item.name}
-                  type="button"
-                  aria-label={item.name}
-                  aria-pressed={active}
-                  onClick={() => select(i, i > index ? 1 : -1)}
-                  className="group grid justify-items-center gap-y-2 flex-none px-1.5 py-1"
-                >
-                  <canvas
-                    ref={(el) => {
-                      thumbsRef.current[i] = el;
-                    }}
-                    width={THUMB_WIDTH}
-                    height={THUMB_HEIGHT}
-                    style={{ backgroundColor: item.stock }}
-                    className={`card-edge block w-[46px] h-[64px] transition-transform duration-200 group-hover:-translate-y-0.5 ${
-                      active ? 'outline outline-1 outline-offset-4 outline-ink' : ''
-                    }`}
-                  />
-                  <span className={`whitespace-nowrap ${MICRO_LABEL} ${active ? 'text-ink' : 'text-inkMuted'}`}>
-                    {item.name}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <button
-            type="button"
-            aria-label="Next card"
-            onClick={() => select(index + 1, 1)}
-            className="grid place-items-center flex-none w-9 h-9 rounded-full border border-ink/20 text-label-md text-ink hover:border-ink transition-colors"
-          >
-            →
-          </button>
-        </nav>
-      </section>
-
-      {/* The selected card. Ruled like the deck's Role / Launch block: a rule
-          over each row, label on the left, value on the right. */}
-      <aside
-        aria-live="polite"
-        className="about-dossier flex flex-col gap-y-4 min-w-0 compact:col-start-10 compact:col-span-3 compact:row-start-1 compact:self-center compact:pr-9"
+      {/* touch-none: there is nothing to scroll here, and a drag in any
+          direction moves the track. A tap, or Enter, opens the front card —
+          there is no button for it. */}
+      <div
+        ref={stageRef}
+        tabIndex={0}
+        role="group"
+        aria-label="Magazine track. Scroll, drag or use the arrow keys to browse; press Enter to open the front magazine."
+        data-source={cards.length && magazines.length && skipped.length < magazines.length ? 'cms' : 'built-in'}
+        onClick={(e) => {
+          // Only the flat stand-in: on the track the scene resolves its own taps.
+          if (mode === 'flat' && e.target === flatRef.current) toggleOpen();
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          toggleOpen();
+        }}
+        className="about-stage absolute inset-0 touch-none cursor-grab active:cursor-grabbing outline-none focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-ink"
       >
-        <p className={`text-inkMuted tabular-nums ${MICRO_LABEL}`}>
-          Gildfold · No. {pad(index + 1)} of {pad(FOIL_CARDS.length)}
-        </p>
-        <h2 className="font-display text-title-h4 wide:text-title-h3 uppercase">{card.name}</h2>
-        <p className="text-paragraph-sm text-inkMuted max-w-[40ch]">{card.desc}</p>
+        {mode === 'flat' && (
+          <canvas
+            ref={flatRef}
+            role="img"
+            aria-label={`${card.name}, ${open ? `inside: “${card.insideMessage}”` : 'front'}`}
+            className="card-edge absolute left-1/2 top-[46%] h-[min(54vh,520px)] w-auto max-w-[80%] -translate-x-1/2 -translate-y-1/2 -rotate-[8deg] cursor-pointer"
+          />
+        )}
+      </div>
 
-        <dl className="flex flex-col border-b border-ink">
-          {specs.map(([label, value]) => (
-            <div key={label} className={RULED_ROW}>
-              <dt className="text-label-xs text-inkMuted">{label}</dt>
-              <dd className="text-label-xs text-ink min-w-0 text-right">{value}</dd>
-            </div>
-          ))}
-        </dl>
+      <div className="about-ui absolute inset-0 pointer-events-none">
+        {/* The line the front card is framed under, and which layout this is:
+            a phone's carousel up to 760px, the stacked track from there to
+            compact, the wide one beyond. The line is under the site's own
+            brand and menu button until compact, a little higher after.
+            Nothing is drawn. */}
+        <span
+          ref={topRef}
+          aria-hidden
+          className="about-top absolute left-0 top-16 [--layout:phone] min-[761px]:[--layout:stacked] compact:top-12 compact:[--layout:wide]"
+        />
 
-        <div className="flex flex-wrap gap-2.5">
-          <button
-            type="button"
-            onClick={toggleOpen}
-            className="min-w-[8.5em] px-4 py-3 rounded-sm border border-ink bg-ink text-label-sm text-canvas hover:opacity-80 transition-opacity"
-          >
-            {open ? 'Close card' : 'Open card'}
-          </button>
-          {mode !== 'flat' && (
-            <button
-              type="button"
-              onClick={() => sceneRef.current?.turnOver()}
-              className="px-4 py-3 rounded-sm border border-ink text-label-sm text-ink hover:opacity-60 transition-opacity"
-            >
-              {turned ? 'Turn back' : 'Turn over'}
-            </button>
-          )}
+        {/* One note, centred under the front card: its foil and stock, its
+            name, its finish. Every line is short enough to stay on one line,
+            so the block keeps its height from card to card and doesn't move.
+            It blurs as another card arrives (useTransitionBlur). */}
+        <div
+          ref={notesRef}
+          aria-live="polite"
+          className="about-notes absolute left-1/2 -translate-x-1/2 bottom-[34px] w-[calc(100%_-_2rem)] compact:bottom-[clamp(26px,5vh,54px)] compact:w-[min(860px,calc(100%_-_3rem))]"
+        >
+          <div ref={blurRef} className="grid justify-items-center gap-y-2 text-center">
+ 
+            <span className={MICRO_LABEL}>
+              {card.foilName} on {card.stockShort}
+            </span>
+            <h1 className={NOTE_TEXT}>{card.name}</h1>
+            <p className="text-paragraph-xs compact:text-paragraph-sm text-inkMuted">{card.finish}</p>
+          </div>
         </div>
-      </aside>
+
+        {mode === 'pressing' && (
+          <p className={`absolute inset-0 grid place-items-center text-inkMuted ${MICRO_LABEL}`}>
+            Pressing foil…
+          </p>
+        )}
+      </div>
     </>
   );
 }

@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
 
 // Typography scale — AlignUI design system ("Typography [Overview]").
 // Each token carries its size, line height, tracking and weight, so a single
@@ -110,6 +111,17 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // `rotated:` — a phone turned on its side: landscape, short, and still
+    // below `compact`. A variant rather than a screen, because a raw media
+    // query among `screens` switches off Tailwind's min-[…] / max-[…]
+    // variants. globals.css repeats the query for the deck's tokens.
+    plugin(({ addVariant }) => {
+      addVariant(
+        "rotated",
+        "@media (orientation: landscape) and (max-height: 540px) and (max-width: 1099px)",
+      );
+    }),
+  ],
 };
 export default config;

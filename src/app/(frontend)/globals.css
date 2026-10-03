@@ -161,6 +161,18 @@
   }
 }
 
+/* A phone turned on its side — the `rotated:` variant (tailwind.config.ts),
+   same query. There is no room beneath the deck there, so the deck takes the
+   left half of the screen and the project's details the right (MobileChrome).
+   The card is sized from the height, which is what runs out, and capped so
+   the centre card (× CENTER_SCALE) stays inside its half. */
+@media (orientation: landscape) and (max-height: 540px) and (max-width: 1099px) {
+  :root {
+    --card-width: min(61dvh, 37vw);
+    --card-shift: -25vw;
+  }
+}
+
 /* The page ground. Lives on both body and main — main needs its own copy so the
    counter's mix-blend-difference has a real backdrop to invert against. */
 .page-canvas {

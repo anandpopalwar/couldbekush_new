@@ -16,7 +16,7 @@ still cite it as the source of a layout decision.)
 - **Styling**: Tailwind CSS 3.4
 - **Animations**: GSAP 3.12
 - **WebGL**: Three.js — the deck's cards as paper and the About page's foil
-  card, each loaded on demand
+  cards, each loaded on demand
 - **Smooth scrolling**: Lenis 1.3 (the home deck's input — see Interactions)
 - **Icons**: Lucide React
 - **Fonts**: Google Sans Flex (everything), Google Sans Code (the mono line)
@@ -30,13 +30,13 @@ src/
 │   ├── page.tsx            # Main portfolio page (client component)
 │   ├── template.tsx        # The route transition, both halves — useRouteSlide()
 │   ├── project/[slug]/     # The case study page
-│   ├── about/              # The About page — a foil card to turn and open
+│   ├── about/              # The About page — foil cards on a 3D track
 │   └── globals.css         # Global styles, 3D perspective, shadows
 ├── components/
 │   ├── transition/
 │   │   └── SlideLink.tsx   # Anchor that navigates through the slide
 │   ├── about/
-│   │   └── FoilCards.tsx   # About's viewer: the stage, the rack, the details
+│   │   └── FoilCards.tsx   # About's stage, and the UI laid over the track
 │   ├── portfolio/
 │   │   ├── ProjectChrome.tsx # The site's furniture off the deck: case study, About
 │   │   ├── HeavyScroll.tsx # Weighted scroller; publishes the two fade vars
@@ -61,7 +61,7 @@ src/
 │   ├── magazinePaper.ts    # The deck's shared WebGL paper renderer
 │   ├── magazinePaperShader.ts # Its GLSL: flex, coat, shadow
 │   ├── foilCards.ts        # About's cards: the artwork, drawn in code, and flat renders
-│   └── foilCardScene.ts    # About's 3D scene: one folded card on a table, lit
+│   └── foilCardScene.ts    # About's 3D scene: the cards on their track, lit
 ├── hooks/
 │   ├── useAudioFeedback.ts # Web Audio API paper flip sounds
 │   ├── useDeckScroll.ts    # Lenis-driven wheel/touch/drag + snapping for the deck
@@ -384,63 +384,133 @@ Things that are load-bearing:
 
 ## The About route
 
-`/about` — laid out like the deck it sits beside: the practice's details in the
-bottom-left corner (the same ruled list as `rail-left-meta`), an object in the
-middle, and what that object is on the right. The object is a folded hot-foil
-greeting card that can be turned in the hand and opened; a rack beneath it
-holds the five designs. Below `compact` the columns stack — stage, rack, the
-card's details, the practice — and the page scrolls in its own scroller, as a
-case study does. At `compact` and up everything fits and nothing scrolls.
+`/about` — one full-bleed stage, exactly one viewport, like the deck. Five
+hot-foil greeting cards sit on a diagonal 3D track — small and far in the
+lower left, large and near in the upper right, the front card centre stage —
+and the front card's details are laid over them. The wheel, a drag, the arrow
+keys and the card nav all move the track; only the front card opens.
 
 ABOUT in every menu goes here through the slide. It was a `SectionModal` panel
 before; Playground and Contact still are, so from a case study or from About
 those two return home.
 
-- **Three files.** `lib/foilCards.ts` is the artwork and the collection;
-  `lib/foilCardScene.ts` is the 3D scene; `components/about/FoilCards.tsx`
-  renders the page's two grid items (the stage column, the card's details) and
-  holds no 3D of its own.
+- **They are called magazines.** That is the word for the About page's cards
+  in the CMS, in the UI text and in conversation. The code's older names
+  (`FoilCards`, `foilCardScene`, `foilCards`) still say "card".
+- **They come from the CMS.** `getMagazines()` reads the published
+  `magazines` (by `order`, then name) and hands the page plain `MagazineData`
+  — text and file URLs, nothing of Payload's. A magazine is image layers in
+  the `magazineLayers` upload collection, every one 1024 × 1434 px and stored
+  exactly as uploaded: `print` (full-colour artwork on its paper), and the
+  masks `foil`, `deboss` and `dieCut`, for each of `front`, `insideLeft`,
+  `insideRight` and `back`. With none published, or the CMS out of reach, the
+  five built-in ones drawn in `lib/foilCards.ts` stand in. README.md has the
+  editor's side of it.
+- **One shape for both sources.** `lib/foilLayers.ts` turns either into a
+  `ViewerCard` whose `layers()` yields canvases — a built-in one from its
+  drawings, a CMS one by loading its files (`crossOrigin`, since they are on
+  Vercel Blob, which answers any origin). A mask file becomes white with the
+  mask in alpha: its brightness × its own alpha, so white-on-black and
+  white-on-transparent both work. A magazine whose layer won't load is warned
+  about and left off the track (`onSkip`).
+- **A face with a `print` is baked from it** — the print replaces the stock
+  and ink mix; foil, deboss and grain are pressed in as before. A face with no
+  layers is bare paper.
+- **The die-cut is mirrored for the cover's inside.** It is drawn as seen
+  from the front and that face is looked at from behind; unmirrored, an
+  off-centre hole would sit in two places.
+- **Don't pass `req` to a lookup inside a field's `validate`.** Fields
+  validate side by side, and two reads on one MongoDB transaction at once
+  fail it — the mask check in `Magazines.ts` reads outside the transaction.
+- **Four files.** `lib/foilCards.ts` is the built-in artwork;
+  `lib/foilLayers.ts` the layers; `lib/foilCardScene.ts` the 3D scene;
+  `components/about/FoilCards.tsx` the stage and the UI over it, which holds
+  no 3D of its own.
+- **Where the UI sits.** One note centred under the front card — and nothing
+  else. The note is the card itself: foil and stock as its label, the name
+  (the page's `h1`), the finish beneath. Each line is short enough to stay on
+  one line, so the note keeps its height and doesn't move from card to card.
+  There is no spec sheet, no card nav, no "Inside" note, no "Open card"
+  button, no hint and no count: the track is moved by the wheel, a drag or the
+  arrow keys, and the greeting is read by opening the card, on a tap or Enter.
+- **The scene frames the card in the room the UI leaves.** `layout()` asks
+  the component's `measure()` for the band between the top line and the note
+  and for how far an open card may reach, then sets the camera's distance and
+  a view offset. The top line is `about-top`, an empty marker: under the
+  site's brand when stacked, a little higher from `compact` up. Its classes
+  also set `--layout` per breakpoint (`phone` up to 760px, `stacked` to
+  `compact`, `wide` beyond), which is how `measure()` tells the layouts apart
+  without repeating the breakpoints in JS. It reads `offset*` rather than
+  `getBoundingClientRect`, and runs on resize only.
+- **A phone has a carousel, not a track.** Up to 760px the front card is
+  centred, 40% down its band, and its neighbours sit 46% of the screen's width
+  to either side — 13% of its height lower, at 42% of the size, cut by the
+  screen's edges — and are gone by 1.6 cards out (`CAROUSEL`, `PHONE_BAND`).
+  It is laid out in px of the stage and turned into world units at the cards'
+  own plane each frame, so the sizes hold as the camera pulls back for an open
+  card. A drag there is read straight across, not along the diagonal. The
+  page's UI is the same as on the stacked layout.
+- **One float drives the track.** `progress`, in card units: an integer puts
+  that card at the front. Input moves `target` and the track eases after it.
+  The wheel snaps once it has gone quiet (`WHEEL_SNAP_MS`); a drag is read
+  along the track's own diagonal and thrown on release; a tap on the front
+  card opens it, on any other brings it forward; the open card closes as soon
+  as the track heads elsewhere. The wheel listener is on `window` and calls
+  `preventDefault` — right here, where nothing scrolls, and nowhere else.
+- **The track goes round, and joins out of sight.** A card that runs off one
+  end comes back on at the other. `setWindow()` (called from `layout()`) walks
+  out from the front card both ways until a card would be off the screen and
+  centres the wrap window on that stretch, so cards leave *through the
+  screen's edges* at full size and the jump is never seen. A fixed window
+  centred on the front card — what the source design had — ended the track
+  well inside a wide screen, the last card shrinking away in the lower left.
+  Only when the screen shows more of the track than five cards can fill (a
+  very wide window) does the far end fall short and shrink.
 - **Nothing is an image.** Each design is drawn in code as white masks — foil,
   ink, blind deboss — in units of `u`, 1% of the card's width, so one drawing
-  serves the 92px thumbnail and the 1024px texture. `flat()` tints the masks
-  for the rack and for the fallback where WebGL isn't available; the scene
-  bakes them into two textures per face: colour, and a data map with height in
-  R, roughness in G and metalness in B.
+  serves any size. The scene bakes the cover and the greeting page into two
+  textures each: colour, and a data map with height in R, roughness in G and
+  metalness in B. The other two faces are bare stock — one shared paper map,
+  tinted. `flat()` tints the same masks for the fallback where WebGL isn't
+  available.
 - **The cards' colours are content, not tokens.** Stock, foil and ink are the
   cards' own materials and live in `FOIL_CARDS` as data, like a project's
-  theme colours. Everything around the card is tokens; its shadows read
-  `--color-shadow` and `--card-shadow-strength`.
-- **The lettering is the site's typeface**, read from `--font-google-sans` /
-  `--font-google-sans-code` rather than named. The designs were drawn around a
-  narrower serif italic, so `TYPE_SCALE` (0.84) sets every size down to keep
-  each line its length. A canvas doesn't wait for a font — `cardFontsReady()`
-  has to resolve before anything is drawn.
+  theme colours. Everything around the cards is tokens.
+- **The lettering is the site's typeface**, read from `--font-google-sans`
+  rather than named. The designs were drawn around a narrower serif italic, so
+  `TYPE_SCALE` (0.84) sets every size down to keep each line its length. A
+  canvas doesn't wait for a font — `cardFontsReady()` has to resolve before
+  anything is drawn.
 - **The scene owns its canvas.** It creates one per instance and appends it to
   the stage rather than being handed one by React: StrictMode mounts effects
   twice and `dispose()` forces a context loss, so a second scene must never
   inherit the context the first one gave up. Three loads from `create()`, which
-  returns null without WebGL 2 — the viewer then goes flat and only "Turn over"
-  is lost.
+  returns null without WebGL 2 — the page then shows the front card flat.
 - **Ported from three r128 to r186, where three things mean something else:**
   - Lights are physical. The directional and hemisphere intensities are the
-    old values × π, and the pointer's glint is in candela.
+    source's values × π, and the pointer's glint is in candela.
   - Colour management is on. The studio's panels and lights were authored as
-    linear values, so they are set with `LinearSRGBColorSpace`; the stock's
-    hex is sRGB and converts by itself.
+    linear values, so they are set with `LinearSRGBColorSpace`; a stock's hex
+    is sRGB and converts by itself.
   - A bump map is read per *screen pixel*, not per world unit. `BUMP_DEPTH` is
-    the stamp's depth in world units and the frame loop multiplies it by the
-    card's size on screen — a fixed `bumpScale` would deepen the relief as the
-    card got smaller.
-- **The die-cut window** is an alpha map on both faces of the cover. r186's
-  shadow pass honours `alphaMap` + `alphaTest` by itself; no
-  `customDepthMaterial`.
-- **The first card is baked a face at a time** (`boot()`), yielding between
-  faces so the page arriving under the slide stays smooth, and then slides in
-  like any later one. A change of card bakes all four faces in one go, while
-  nothing is on screen. Coarse pointers bake at 768px wide instead of 1024.
-- **State lives in the scene.** It reports `{ index, open, turned }` and the
-  component only labels its buttons from that. Until the scene exists, and
-  without WebGL, the component keeps `index` and `open` itself.
+    the stamp's depth in world units, and the frame loop turns it into each
+    card's `bumpScale` from that card's own distance — a fixed value would
+    deepen the relief on the far cards.
+- **The die-cut window** is an alpha map on both faces of the cover.
+- **Building.** `boot()` bakes the paper map and the front card a step at a
+  time, so the page arriving under the slide stays smooth; the rest of the
+  rack follows one card a frame, nearest first. All five stay built — which is
+  why textures are 768px wide — and nothing is disposed until the page is
+  left.
+- **State lives in the scene.** It reports `{ index, open }` and the component
+  only labels itself from that. Until the scene exists, and without WebGL, the
+  component keeps both itself.
+- **`!leading-*`** on the note's main line is deliberate: a
+  `text-*` token inside a breakpoint carries its own line height and beats a
+  plain `leading-*` class.
+- **The note blurs between magazines** — `useTransitionBlur`, the same hook
+  and the same blink as the deck's text: blurred while the track moves,
+  sharp once it settles.
 
 ## Design System
 
@@ -534,9 +604,9 @@ strings against source files.
 | Left rail | `rail-left`, `rail-left-nav`, `rail-left-meta`, `work-counter` |
 | Right rail | `rail-right`, `rail-right-viewport`, `rail-right-track`, `rail-right-slot`, `rail-right-swatches`, `rail-right-showreel` |
 | Deck | `deck-scroller`, `deck-stage`, `deck-frame`, `deck-card`, `deck-hint` |
-| Below 1100 | `menu-toggle`, `mobile-brand`, `mobile-counter`, `mobile-detail`, `mobile-swatches`, `mobile-menu`, `mobile-menu-nav`, `mobile-menu-footer` |
+| Below 1100 | `menu-toggle`, `mobile-brand`, `mobile-info`, `mobile-counter`, `mobile-detail`, `mobile-swatches`, `mobile-menu`, `mobile-menu-nav`, `mobile-menu-footer` |
 | Case study | `case-study`, `case-study-body`, `case-study-rail`, `case-study-shots`, `case-study-shot`, `case-study-minimap`, `case-study-title`, `case-study-next` |
-| About | `about-page`, `about-body`, `about-stage-column`, `about-stage`, `about-hint`, `about-rack`, `about-dossier`, `about-meta` |
+| About | `about-page`, `about-stage`, `about-ui`, `about-top`, `about-notes` |
 | Overlays | `grain-overlay`, `toast` |
 
 **They carry no styles and must not be given any.** Styling lives in Tailwind
@@ -558,6 +628,7 @@ variants. Added **alongside** Tailwind's defaults, which still work.
 | `desktop:` | 1200–1439 | |
 | `wide:` | 1440–2399 | the primary design target |
 | `ultra:` | 2400+ | |
+| `rotated:` | landscape, ≤540 tall, ≤1099 wide | a phone on its side |
 
 They live in the config, not as CSS tokens, because a media query cannot read a
 custom property.
@@ -571,6 +642,15 @@ There is no header at any width. The contact line, "Working globally", the
 audio toggle and the scroll hint were removed, and `TopHeader` with them. The
 address now appears only in the Contact panel and in the mobile menu's
 footer.
+
+`rotated:` is a variant, not a screen — a raw media query among `screens`
+switches off Tailwind's `min-[…]` / `max-[…]` variants. On a phone turned on
+its side there is no room beneath the deck, so it becomes two halves: the deck
+on the left (`--card-shift: -25vw`, the card sized from the height) and the
+project's details, swatches and number on the right. `mobile-info` wraps those
+three: `contents` upright, so it has no box to come between a blend and its
+backdrop, and a centred column when rotated — where they are set in plain ink,
+since nothing is behind them but the page.
 
 `body` is `h-dvh`, not `h-screen`. On a phone `100vh` is the height with the
 browser's toolbar hidden, so while the bar was showing the page was taller

@@ -75,6 +75,15 @@ export function MobileChrome({
         </span>
       </div>
 
+      {/* The project's details and its number. Upright, these are three blocks
+          pinned over the page, each on its own (see below), and this wrapper
+          is `contents`: it has no box, so it can't come between a blend and
+          its backdrop. On a phone turned on its side (`rotated:`) there is no
+          room beneath the deck. The deck takes the left half (--card-shift)
+          and this becomes the right half — a centred column holding the three
+          in order. Nothing is behind them there but the page, so the blend
+          gives way to plain ink. */}
+      <div className="mobile-info contents compact:hidden rotated:fixed rotated:inset-y-0 rotated:right-0 rotated:z-30 rotated:flex rotated:w-1/2 rotated:flex-col rotated:items-center rotated:justify-center rotated:gap-y-3 rotated:px-6 rotated:pointer-events-none">
       {/* Project detail, beneath the deck. Same order and type as the right
           sidebar's centred item, so the two layouts read as one design.
 
@@ -86,7 +95,7 @@ export function MobileChrome({
           reason — a filter on a parent would create that isolating context. */}
       <div
         ref={blurRef}
-        className="mobile-detail compact:hidden fixed bottom-32 left-0 right-0 z-30 px-6 flex flex-col items-center text-center pointer-events-none text-invert mix-blend-difference"
+        className="mobile-detail compact:hidden fixed bottom-32 left-0 right-0 z-30 px-6 flex flex-col items-center text-center pointer-events-none text-invert mix-blend-difference rotated:static rotated:px-0 rotated:text-ink rotated:mix-blend-normal"
       >
         <span className="rs-sub font-code uppercase">
           {activeProject.subtitle}
@@ -109,7 +118,7 @@ export function MobileChrome({
       {activeProject.themeColors && activeProject.themeColors.length > 0 && (
         <div
           ref={blurRef}
-          className="mobile-swatches compact:hidden fixed bottom-24 left-0 right-0 z-30 flex justify-center gap-x-1.5 pointer-events-none"
+          className="mobile-swatches compact:hidden fixed bottom-24 left-0 right-0 z-30 flex justify-center gap-x-1.5 pointer-events-none rotated:static"
         >
           {activeProject.themeColors.map((color, i) => (
             <span
@@ -132,11 +141,12 @@ export function MobileChrome({
           context and render solid white. */}
       <div
         ref={blurRef}
-        className="mobile-counter compact:hidden fixed bottom-6 left-0 right-0 z-30 flex justify-center pointer-events-none text-invert mix-blend-difference"
+        className="mobile-counter compact:hidden fixed bottom-6 left-0 right-0 z-30 flex justify-center pointer-events-none text-invert mix-blend-difference rotated:static rotated:text-ink rotated:mix-blend-normal"
       >
         <span className="counter-numeral text-title-h1 tracking-tight inline-block leading-none tabular-nums">
           {activeProject.id}
         </span>
+      </div>
       </div>
 
       {menuOpen && (

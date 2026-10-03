@@ -3,11 +3,14 @@
  *
  * Nothing here is an image. Each design is a set of white masks painted on a
  * 2D canvas — one for the foil, one for the ink, one for the blind deboss —
- * in units of `u`, 1% of the card's width, so the same drawing serves a 92px
- * thumbnail and a 1024px texture. What fills a mask is decided by whoever
- * asked for it: lib/foilCardScene.ts turns them into the colour, height,
- * roughness and metalness of a lit 3D card; `flat()` below tints them for the
- * rack's thumbnails and for the fallback where WebGL isn't available.
+ * in units of `u`, 1% of the card's width, so the same drawing serves any
+ * size. What fills a mask is decided by whoever asked for it:
+ * lib/foilCardScene.ts turns them into the colour, height, roughness and
+ * metalness of a lit 3D card, and lib/foilLayers.ts tints them flat for the
+ * fallback where WebGL isn't available.
+ *
+ * These are the built-in magazines: what the About page shows when the CMS
+ * has none published.
  *
  * The stock, foil and ink colours are the cards' own materials — content, like
  * a project's theme colours — so they live here as data. The lettering is the
@@ -28,8 +31,10 @@ export interface FoilCard {
   grad: string[];
   finish: string;
   envelope: string;
-  /** Ink inside the card, and the quieter one for the imprint on the back. */
+  /** Ink inside the card. */
   ink: string;
+  /** Part of the design, not shown at the moment: the quieter ink a printed
+      back would use, and the card's description. */
   backInk: string;
   desc: string;
   /** The greeting inside, where it sits (share of the height), and whether
@@ -50,33 +55,25 @@ export const CARD_ASPECT = 1.4;
 // The designs were drawn around a narrower face; the site's runs wider, so
 // every size is set down by this much to keep each line the length it was.
 const TYPE_SCALE = 0.84;
-// How the blind deboss and the die-cut's shade read in a flat render.
-const FLAT_DEBOSS = 'rgba(60,40,20,.16)';
-const FLAT_WINDOW_SHADE = 'rgba(0,0,0,.22)';
 
-let faces: { sans: string; code: string } | null = null;
+let face = '';
 
-/** The site's faces, straight from the font tokens. */
-function fonts() {
-  if (!faces) {
-    const style = getComputedStyle(document.documentElement);
-    faces = {
-      sans: style.getPropertyValue('--font-google-sans').trim() || 'sans-serif',
-      code: style.getPropertyValue('--font-google-sans-code').trim() || 'monospace',
-    };
-  }
-  return faces;
+/** The site's typeface, straight from the font token. */
+function family() {
+  face ||=
+    getComputedStyle(document.documentElement).getPropertyValue('--font-google-sans').trim() ||
+    'sans-serif';
+  return face;
 }
 
-/** Resolves once the lettering's faces are loaded — a canvas won't wait for them. */
+/** Resolves once the lettering's face is loaded — a canvas won't wait for it. */
 export async function cardFontsReady() {
-  const { sans, code } = fonts();
+  const sans = family();
   try {
     await Promise.race([
       Promise.all([
         document.fonts.load(`500 64px ${sans}`, 'Hooray'),
-        document.fonts.load(`600 64px ${sans}`, 'GILDFOLD'),
-        document.fonts.load(`500 20px ${code}`, 'HOT'),
+        document.fonts.load(`600 64px ${sans}`, 'FERN'),
       ]),
       new Promise((resolve) => setTimeout(resolve, 3500)),
     ]);
@@ -115,7 +112,7 @@ export function layer(draw: Draw, w: number, h: number) {
 }
 
 function lettering(ctx: CanvasRenderingContext2D, px: number, weight = 500) {
-  ctx.font = `${weight} ${px * TYPE_SCALE}px ${fonts().sans}`;
+  ctx.font = `${weight} ${px * TYPE_SCALE}px ${family()}`;
 }
 
 /** Centred text with tracking — canvas has no letter-spacing everywhere yet. */
@@ -160,20 +157,6 @@ export function message(ctx: CanvasRenderingContext2D, w: number, h: number, lin
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   lines.forEach((line, i) => ctx.fillText(line, w / 2, y0 + i * 8.6 * u));
-}
-
-/** The imprint on the back: the maker, the card, how it was made. */
-export function backText(card: FoilCard): Draw {
-  return (ctx, w, h) => {
-    const u = w / 100;
-    lettering(ctx, 2.6 * u, 600);
-    spaced(ctx, 'GILDFOLD', w / 2, h * 0.872, 1.3 * u);
-    lettering(ctx, 2.2 * u, 400);
-    ctx.textAlign = 'center';
-    ctx.fillText(`${card.name}. ${card.foilName} foil on ${card.stockShort}.`, w / 2, h * 0.9);
-    ctx.font = `500 ${1.55 * u}px ${fonts().code}`;
-    ctx.fillText('HOT-FOIL STAMPED BY HAND · 5 × 7 IN', w / 2, h * 0.925);
-  };
 }
 
 /** One fern leaflet: a tapered blade with small lobes along both edges. */
@@ -511,57 +494,3 @@ export const FOIL_CARDS: FoilCard[] = [
     },
   },
 ];
-
-/* ── flat renders ──────────────────────────────────────────────────────── */
-
-/**
- * A card drawn flat, `w` px wide: the rack's thumbnails, and the whole viewer
- * where WebGL isn't available. The foil is its colour ramp rather than a
- * reflection, and the deboss a faint tint.
- */
-export function flat(card: FoilCard, w: number, side: 'front' | 'inside') {
-  const h = Math.round(w * CARD_ASPECT);
-  const canvas = mk(w, h);
-  const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = card.stock;
-  ctx.fillRect(0, 0, w, h);
-
-  const foil = () => {
-    const gradient = ctx.createLinearGradient(0, 0, w, h);
-    card.grad.forEach((stop, i) => gradient.addColorStop(i / (card.grad.length - 1), stop));
-    return gradient;
-  };
-  const tint = (mask: HTMLCanvasElement, fill: string | CanvasGradient) => {
-    const tinted = mk(w, h);
-    const tx = tinted.getContext('2d')!;
-    tx.drawImage(mask, 0, 0);
-    tx.globalCompositeOperation = 'source-in';
-    tx.fillStyle = fill;
-    tx.fillRect(0, 0, w, h);
-    ctx.drawImage(tinted, 0, 0);
-  };
-
-  if (side === 'inside') {
-    if (card.inside) tint(layer(card.inside, w, h), foil());
-    tint(
-      layer((c, W, H) => message(c, W, H, card.message, H * card.msgY), w, h),
-      card.foilMessage ? foil() : card.ink,
-    );
-    return canvas;
-  }
-
-  if (card.deboss) tint(layer(card.deboss, w, h), FLAT_DEBOSS);
-  if (card.dieCut && card.inside) {
-    const { x, y, r } = card.dieCut;
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(w * x, h * y, w * r, 0, Math.PI * 2);
-    ctx.clip();
-    ctx.fillStyle = FLAT_WINDOW_SHADE;
-    ctx.fillRect(0, 0, w, h);
-    tint(layer(card.inside, w, h), foil());
-    ctx.restore();
-  }
-  tint(layer(card.front, w, h), foil());
-  return canvas;
-}

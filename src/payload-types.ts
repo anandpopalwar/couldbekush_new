@@ -72,6 +72,8 @@ export interface Config {
     categories: Category;
     projects: Project;
     posts: Post;
+    magazines: Magazine;
+    magazineLayers: MagazineLayer;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
@@ -85,6 +87,8 @@ export interface Config {
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     projects: ProjectsSelect<false> | ProjectsSelect<true>;
     posts: PostsSelect<false> | PostsSelect<true>;
+    magazines: MagazinesSelect<false> | MagazinesSelect<true>;
+    magazineLayers: MagazineLayersSelect<false> | MagazineLayersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -420,6 +424,138 @@ export interface Post {
   _status?: ('draft' | 'published') | null;
 }
 /**
+ * The magazines on the About page. Only published ones are shown; with none published, the five built-in ones appear.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "magazines".
+ */
+export interface Magazine {
+  id: string;
+  name: string;
+  /**
+   * Where it sits on the track. Lowest first, then by name.
+   */
+  order?: number | null;
+  stock: {
+    /**
+     * The paper, in full — "Cream cotton, 350 gsm".
+     */
+    label: string;
+    /**
+     * And in two words — "cream cotton".
+     */
+    short: string;
+    /**
+     * The paper's colour, as 6-digit hex. Bare faces and the edges are this.
+     */
+    color: string;
+  };
+  foil: {
+    label: 'Gold' | 'Silver' | 'Copper' | 'Rose gold';
+    /**
+     * 6-digit hex. Leave empty to use the foil's own colour.
+     */
+    color?: string | null;
+  };
+  finish?: string | null;
+  envelope?: string | null;
+  /**
+   * The greeting inside. Read out to screen readers; not printed by this field.
+   */
+  insideMessage?: string | null;
+  front: {
+    /**
+     * Full-colour artwork on the paper colour, without foil. 1024 × 1434 px. WebP, PNG or JPG.
+     */
+    print: string | MagazineLayer;
+    /**
+     * PNG, 1024 × 1434 px. White = foil, black = paper. No gradients or effects.
+     */
+    foil?: (string | null) | MagazineLayer;
+    /**
+     * PNG, 1024 × 1434 px. White = pressed into the paper without foil.
+     */
+    deboss?: (string | null) | MagazineLayer;
+    /**
+     * PNG, 1024 × 1434 px. Black = hole, white = paper. Drawn as seen from the front.
+     */
+    dieCut?: (string | null) | MagazineLayer;
+  };
+  /**
+   * The inside of the cover, as you see it with the magazine open. Leave empty for plain paper.
+   */
+  insideLeft?: {
+    /**
+     * Full-colour artwork on the paper colour, without foil. 1024 × 1434 px. WebP, PNG or JPG.
+     */
+    print?: (string | null) | MagazineLayer;
+    /**
+     * PNG, 1024 × 1434 px. White = foil, black = paper. No gradients or effects.
+     */
+    foil?: (string | null) | MagazineLayer;
+    /**
+     * PNG, 1024 × 1434 px. White = pressed into the paper without foil.
+     */
+    deboss?: (string | null) | MagazineLayer;
+  };
+  /**
+   * The page that carries the greeting. Leave empty for plain paper.
+   */
+  insideRight?: {
+    /**
+     * Full-colour artwork on the paper colour, without foil. 1024 × 1434 px. WebP, PNG or JPG.
+     */
+    print?: (string | null) | MagazineLayer;
+    /**
+     * PNG, 1024 × 1434 px. White = foil, black = paper. No gradients or effects.
+     */
+    foil?: (string | null) | MagazineLayer;
+    /**
+     * PNG, 1024 × 1434 px. White = pressed into the paper without foil.
+     */
+    deboss?: (string | null) | MagazineLayer;
+  };
+  /**
+   * Leave empty for plain paper.
+   */
+  back?: {
+    /**
+     * Full-colour artwork on the paper colour, without foil. 1024 × 1434 px. WebP, PNG or JPG.
+     */
+    print?: (string | null) | MagazineLayer;
+    /**
+     * PNG, 1024 × 1434 px. White = foil, black = paper. No gradients or effects.
+     */
+    foil?: (string | null) | MagazineLayer;
+    /**
+     * PNG, 1024 × 1434 px. White = pressed into the paper without foil.
+     */
+    deboss?: (string | null) | MagazineLayer;
+  };
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * Image layers for the About page's magazines. Every layer is 1024 × 1434 px. Files are stored exactly as uploaded.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "magazineLayers".
+ */
+export interface MagazineLayer {
+  id: string;
+  prefix?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -554,6 +690,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'posts';
         value: string | Post;
+      } | null)
+    | ({
+        relationTo: 'magazines';
+        value: string | Magazine;
+      } | null)
+    | ({
+        relationTo: 'magazineLayers';
+        value: string | MagazineLayer;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -846,6 +990,78 @@ export interface PostsSelect<T extends boolean = true> {
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "magazines_select".
+ */
+export interface MagazinesSelect<T extends boolean = true> {
+  name?: T;
+  order?: T;
+  stock?:
+    | T
+    | {
+        label?: T;
+        short?: T;
+        color?: T;
+      };
+  foil?:
+    | T
+    | {
+        label?: T;
+        color?: T;
+      };
+  finish?: T;
+  envelope?: T;
+  insideMessage?: T;
+  front?:
+    | T
+    | {
+        print?: T;
+        foil?: T;
+        deboss?: T;
+        dieCut?: T;
+      };
+  insideLeft?:
+    | T
+    | {
+        print?: T;
+        foil?: T;
+        deboss?: T;
+      };
+  insideRight?:
+    | T
+    | {
+        print?: T;
+        foil?: T;
+        deboss?: T;
+      };
+  back?:
+    | T
+    | {
+        print?: T;
+        foil?: T;
+        deboss?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "magazineLayers_select".
+ */
+export interface MagazineLayersSelect<T extends boolean = true> {
+  prefix?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

@@ -8,22 +8,26 @@ import {
 } from "react";
 import gsap from "gsap";
 import { Project } from "@/types/portfolio";
+import { SlideLink } from "@/components/transition/SlideLink";
 
 interface RightSidebarProps {
   projects: Project[];
   currentIndex: number;
-  onGoToIndex: (
-    index: number,
-    direction?: "up" | "down",
-    stepDelta?: number,
-  ) => void;
+  /** Bring a project to the centre of the deck. */
+  onGoToIndex: (index: number) => void;
 }
 
-const ITEM_HEIGHT = 150;
+// Slot pitch — the gap between cards. Drives both the slot height and the
+// track's glide, so it's the one number to change.
+const ITEM_HEIGHT = 180;
 // Number of slots rendered above / below the center slot. The track only ever
 // holds these (2*R + 1) fixed slots and never scrolls more than one card, so a
 // runaway multi-card "sweep" is structurally impossible.
-const SLOT_RADIUS = 8;
+// One more than VISIBLE_RADIUS, so the card gliding in has a slot to come from.
+const SLOT_RADIUS = 3;
+// Slots either side of centre that are shown — 2 gives five cards. Beyond it a
+// slot fades out over its last card of travel and stops taking clicks.
+const VISIBLE_RADIUS = 2;
 
 // A slot's appearance is a function of how far it actually is from the centre of
 // the viewport, not of which slot happens to hold the selected project. The
@@ -61,7 +65,15 @@ function ramp() {
 }
 
 function slotFade(distance: number) {
-  return Math.max(MIN_FADE, Math.pow(SLOT_FALLOFF, distance));
+  const falloff = Math.max(MIN_FADE, Math.pow(SLOT_FALLOFF, distance));
+  // 1 up to VISIBLE_RADIUS, 0 a whole slot past it.
+  const shown = Math.min(1, Math.max(0, VISIBLE_RADIUS + 1 - distance));
+  return falloff * shown;
+}
+
+/** Whether a slot at this distance is on show, and so clickable. */
+function slotShown(distance: number) {
+  return distance < VISIBLE_RADIUS + 0.5;
 }
 
 /** 1 when a slot is dead centre, 0 once it is a full slot away. */
@@ -74,6 +86,25 @@ function slotColor(emphasis: number) {
   const channel = (i: number) =>
     Math.round(plain[i] + (ink[i] - plain[i]) * emphasis);
   return `rgb(${channel(0)}, ${channel(1)}, ${channel(2)})`;
+}
+
+const SLOT_CONTENT_CLASS =
+  "w-full h-full flex flex-col items-center justify-center text-center cursor-pointer";
+
+function SlotContent({ project }: { project: Project }) {
+  return (
+    <>
+      <span className="rs-sub font-code uppercase mb-1">
+        {project.subtitle}
+      </span>
+
+      <h4 className="rs-title uppercase">{project.title}</h4>
+
+      <p className="rs-desc max-w-[280px] line-clamp-3">
+        {project.description}
+      </p>
+    </>
+  );
 }
 
 // useLayoutEffect on the client (positions the track before paint so relabels
@@ -120,6 +151,7 @@ export function RightSidebar({
 
       const emphasis = slotEmphasis(distance);
       el.style.opacity = slotFade(distance).toFixed(3);
+      el.style.pointerEvents = slotShown(distance) ? "auto" : "none";
       el.style.color = slotColor(emphasis);
       el.style.setProperty("--u", emphasis.toFixed(3));
     });
@@ -195,7 +227,7 @@ export function RightSidebar({
     <aside className="rail-right hidden compact:flex compact:col-start-10 compact:col-span-3 compact:row-start-1 h-full flex-col justify-between pointer-events-auto pl-0 pr-30 overflow-hidden relative">
       <div
         ref={viewportRef}
-        className="rail-right-viewport w-full h-full relative overflow-hidden touch-none"
+        className="rail-right-viewport rs-edge-fade w-full h-full relative overflow-hidden touch-none"
       >
         <div ref={trackRef} className="rail-right-track absolute top-0 left-0 w-full will-change-transform">
           {Array.from({ length: slotCount }, (_, j) => {
@@ -218,30 +250,39 @@ export function RightSidebar({
                 ref={(el) => {
                   slotsRef.current[j] = el;
                 }}
-                onClick={() => {
-                  if (isCenter) return;
-                  onGoToIndex(pIdx, s < 0 ? "down" : "up");
-                }}
+                // Out of the tab order and the accessibility tree while hidden.
+                inert={!slotShown(distance)}
                 style={
                   {
                     opacity: slotFade(distance),
                     color: slotColor(emphasis),
+                    pointerEvents: slotShown(distance) ? "auto" : "none",
+                    height: ITEM_HEIGHT,
                     "--u": emphasis,
                   } as React.CSSProperties
                 }
-                className="rail-right-slot rs-slot h-[150px] relative flex flex-col items-center justify-center text-center cursor-pointer select-none px-0 pr-28 "
+                className="rail-right-slot rs-slot relative select-none px-0 pr-28"
               >
-                <span className="rs-sub font-code uppercase mb-1">
-                  {project.subtitle}
-                </span>
-
-                <h4 className="rs-title uppercase">{project.title}</h4>
-
-                <span className="rs-dash my-1">—</span>
-
-                <p className="rs-desc max-w-[280px] line-clamp-3">
-                  {project.description}
-                </p>
+                {isCenter ? (
+                  // Only the active project opens — with the same href and
+                  // label as the deck's centre card, so the two always agree.
+                  <SlideLink
+                    href={`/project/${project.slug}`}
+                    label={project.title}
+                    className={SLOT_CONTENT_CLASS}
+                  >
+                    <SlotContent project={project} />
+                  </SlideLink>
+                ) : (
+                  // Any other slot brings its project to the centre instead.
+                  <button
+                    type="button"
+                    onClick={() => onGoToIndex(pIdx)}
+                    className={SLOT_CONTENT_CLASS}
+                  >
+                    <SlotContent project={project} />
+                  </button>
+                )}
               </div>
             );
           })}

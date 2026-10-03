@@ -2,28 +2,23 @@
 
 import { useCallback, useState } from 'react';
 import { SlideLink } from '@/components/transition/SlideLink';
-import { TopHeader } from '@/components/portfolio/TopHeader';
 import { MenuToggle } from '@/components/portfolio/MenuToggle';
 import { MobileMenu } from '@/components/portfolio/MobileMenu';
 import { useRouteSlide } from '@/app/(frontend)/template';
-import { useAudioFeedback } from '@/hooks/useAudioFeedback';
 
 /**
  * The site's furniture, kept on a case study so the page reads as part of the
- * site rather than a document it links out to: the menu, the header, the scroll
- * hint. Same positions as on the deck, at both layouts.
+ * site rather than a document it links out to: the menu. Same position as on
+ * the deck, at both layouts.
  *
  * The nav sections open panels that belong to the deck, so from here every item
  * — in the desktop rail and in the stacked layout's full-screen panel alike —
- * returns home rather than trying to reproduce them. `useAudioFeedback` is
- * instantiated fresh — the deck is unmounted on this route, so there is no
- * second instance to conflict with.
+ * returns home rather than trying to reproduce them.
  */
 
 const NAV_ITEMS = ['Work', 'About', 'Playground', 'Contact'];
 
 export function ProjectChrome() {
-  const { audioEnabled, toggleAudio } = useAudioFeedback();
   const { slideTo } = useRouteSlide();
 
   // Menu state lives here rather than in a parent: on the deck it is owned by
@@ -50,12 +45,6 @@ export function ProjectChrome() {
 
   return (
     <>
-      <TopHeader
-        audioEnabled={audioEnabled}
-        onToggleAudio={toggleAudio}
-        onSelectSection={() => {}}
-      />
-
       <div className="chrome-nav hidden compact:block fixed top-6 left-6 z-30 pointer-events-auto">
         <span className="block text-micro-md font-mono tracking-widest text-inkMuted uppercase mb-4">
           Menu
@@ -76,10 +65,6 @@ export function ProjectChrome() {
           ))}
         </nav>
       </div>
-
-      <span className="scroll-hint hidden compact:block fixed bottom-6 left-5 z-30 text-micro-md tracking-wide text-inkMuted pointer-events-none">
-        Scroll
-      </span>
 
       {/* Below 1100 the rail is gone, so the stacked layout's chrome stands in
           for it — the same toggle and brand as the deck, in the same places, so

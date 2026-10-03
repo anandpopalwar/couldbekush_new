@@ -2,6 +2,7 @@ import type { CollectionConfig } from "payload";
 import { authenticated, publishedOrAuthenticated } from "../access";
 import { slugField } from "../fields/slug";
 import { contentBlocks } from "../blocks";
+import { revalidateAfterChange, revalidateAfterDelete } from "./revalidate";
 
 // Mirrors the existing src/data/projects.ts shape so the card-deck frontend can
 // consume it, plus drafts/versions, SEO (added via the plugin) and access control.
@@ -16,6 +17,10 @@ export const Projects: CollectionConfig = {
     create: authenticated,
     update: authenticated,
     delete: authenticated,
+  },
+  hooks: {
+    afterChange: [revalidateAfterChange],
+    afterDelete: [revalidateAfterDelete],
   },
   versions: {
     maxPerDoc: 25,

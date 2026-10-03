@@ -13,7 +13,6 @@ import { MenuToggle } from '@/components/portfolio/MenuToggle';
  *
  *   ┌────────────────────┐
  *   │ ☰    couldbekush   │  menu left, brand centred
- *   │ 01 /19             │  page number beneath the menu
  *   │                    │
  *   │      [ card ]      │  the deck, centred by CardDeck2 itself
  *   │                    │
@@ -22,6 +21,7 @@ import { MenuToggle } from '@/components/portfolio/MenuToggle';
  *   │         —          │
  *   │   A fresh website  │  description
  *   │       ▪ ▪ ▪        │  theme swatches
+ *   │         01         │  page number
  *   └────────────────────┘
  *
  * Everything here is `compact:hidden`, so it never reaches the desktop layout.
@@ -29,7 +29,6 @@ import { MenuToggle } from '@/components/portfolio/MenuToggle';
 
 interface MobileChromeProps {
   activeProject: Project;
-  totalCount: number;
   activeSection: NavSection;
   onSelectSection: (section: NavSection) => void;
   // Menu state lives in PortfolioClient so the deck's wheel and keyboard
@@ -41,7 +40,6 @@ interface MobileChromeProps {
 
 export function MobileChrome({
   activeProject,
-  totalCount,
   activeSection,
   onSelectSection,
   menuOpen,
@@ -49,7 +47,7 @@ export function MobileChrome({
   onCloseMenu,
 }: MobileChromeProps) {
   // Same blink as the desktop sidebar: blurred while the deck moves, sharp once
-  // it settles. Attached to the page number and the project block below.
+  // it settles. Attached to the project block, swatches and page number.
   const blurRef = useTransitionBlur(activeProject.id);
 
   // The panel outlives the dismiss request: `closing` runs its blur-out, and
@@ -74,27 +72,6 @@ export function MobileChrome({
       <div className="mobile-brand compact:hidden fixed top-5 left-0 right-0 z-40 flex justify-center pointer-events-none">
         <span className="text-title-h6 text-ink tracking-tight leading-none">
           couldbekush
-        </span>
-      </div>
-
-      {/* Page number, stacked under the menu button. Set exactly like the
-          deck's counter — the same wght/wdth/opsz axes off .counter-numeral,
-          inverted against the page — but kept at this layout's own size.
-
-          The blend sits on this fixed element rather than on the numeral
-          inside it, for the reason spelled out on mobile-detail below: z-30
-          puts it above main (z-20) so main's pixels are its backdrop, while a
-          blend on a child would be isolated by this element's own stacking
-          context and render solid white. */}
-      <div
-        ref={blurRef}
-        className="mobile-counter compact:hidden fixed top-20 left-6 z-30 flex items-start gap-x-2 pointer-events-none text-invert mix-blend-difference"
-      >
-        <span className="counter-numeral text-title-h1 tracking-tight inline-block leading-none tabular-nums">
-          {activeProject.id}
-        </span>
-        <span className="text-label-xs text-inkMuted tabular-nums">
-          /{String(totalCount).padStart(2, '0')}
         </span>
       </div>
 
@@ -143,6 +120,24 @@ export function MobileChrome({
           ))}
         </div>
       )}
+
+      {/* Page number, centred beneath the swatches. Set exactly like the
+          deck's counter — the same wght/wdth/opsz axes off .counter-numeral,
+          inverted against the page — but kept at this layout's own size.
+
+          The blend sits on this fixed element rather than on the numeral
+          inside it, for the reason spelled out on mobile-detail below: z-30
+          puts it above main (z-20) so main's pixels are its backdrop, while a
+          blend on a child would be isolated by this element's own stacking
+          context and render solid white. */}
+      <div
+        ref={blurRef}
+        className="mobile-counter compact:hidden fixed bottom-6 left-0 right-0 z-30 flex justify-center pointer-events-none text-invert mix-blend-difference"
+      >
+        <span className="counter-numeral text-title-h1 tracking-tight inline-block leading-none tabular-nums">
+          {activeProject.id}
+        </span>
+      </div>
 
       {menuOpen && (
         <MobileMenu

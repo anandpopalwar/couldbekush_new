@@ -48,11 +48,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // suppressHydrationWarning: browser extensions add their own classes to
+    // <html> before React hydrates, and React reports that as a mismatch. It
+    // covers this element's attributes only, not anything inside it.
     <html
       lang="en"
+      suppressHydrationWarning
       className={`h-full select-none ${googleSans.variable} ${googleSansCode.variable}`}
     >
-      <body className="page-canvas h-screen w-screen relative font-sans select-none overflow-hidden p-0 text-micro-lg leading-relaxed tracking-tight antialiased">
+      {/* h-dvh, not h-screen: 100vh on a phone is the height with the browser's
+          toolbar hidden, so while the bar is showing the page is taller than
+          what's visible and the deck's centre sits below the real middle. dvh
+          tracks the visible height as the bar comes and goes. */}
+      <body className="page-canvas h-dvh w-screen relative font-sans select-none overflow-hidden p-0 text-micro-lg leading-relaxed tracking-tight antialiased">
         {children}
       </body>
     </html>

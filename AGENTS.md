@@ -15,6 +15,8 @@ still cite it as the source of a layout decision.)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS 3.4
 - **Animations**: GSAP 3.12
+- **WebGL**: Three.js — the deck's cards as paper, loaded on demand
+- **Smooth scrolling**: Lenis 1.3 (the home deck's input — see Interactions)
 - **Icons**: Lucide React
 - **Fonts**: Google Sans Flex (everything), Google Sans Code (the mono line)
 - **Build**: PostCSS, Autoprefixer
@@ -35,7 +37,6 @@ src/
 │   │   ├── ProjectChrome.tsx # The site's furniture on a case study
 │   │   ├── HeavyScroll.tsx # Weighted scroller; publishes the two fade vars
 │   │   ├── PageEnter.tsx   # Step 4 of the transition — the arrival bounce
-│   │   ├── TopHeader.tsx   # Brand mark, nav, audio toggle, inquiries
 │   │   ├── LeftSidebar.tsx # Menu nav, project metadata, counter
 │   │   ├── CardDeck.tsx    # Diagonal 3D card stack (superseded by CardDeck2)
 │   │   ├── CardDeck2.tsx   # Vertical conveyor deck — the one in use
@@ -48,13 +49,16 @@ src/
 │   │   └── SectionModal.tsx# About, Playground, Contact modals
 │   └── ui/
 │       ├── GrainOverlay.tsx # Film grain texture overlay
-│       └── Toast.tsx        # Toast notifications
+│       └── Toast.tsx        # Toast notifications (nothing raises one now)
 ├── data/
 │   └── projects.ts         # 8 portfolio projects with metadata
 ├── lib/
-│   └── routeTransition.ts  # Carries the destination name across the boundary
+│   ├── routeTransition.ts  # Carries the destination name across the boundary
+│   ├── magazinePaper.ts    # The deck's shared WebGL paper renderer
+│   └── magazinePaperShader.ts # Its GLSL: flex, coat, shadow
 ├── hooks/
 │   ├── useAudioFeedback.ts # Web Audio API paper flip sounds
+│   ├── useDeckScroll.ts    # Lenis-driven wheel/touch/drag + snapping for the deck
 │   └── useTransitionBlur.ts# Blur-while-moving, shared by sidebar + mobile
 └── types/
     └── portfolio.ts        # Project & NavSection types
@@ -72,15 +76,19 @@ reference but is commented out.
   float — `positionRef`, in card units, owned by `PortfolioClient`. An integer
   centres that card; 4.5 sits exactly between two. Input writes to it and the
   deck renders whatever it says, once per frame. There are no per-card tweens.
+  `useDeckScroll` is what writes it — see Interactions.
   That is what lets a scroll be *followed* as it happens and snapped only when
   it stops; a stepping model can never rest between two cards.
 - **Conveyor, not carousel**: a short ring of slots around the rounded position,
   each keyed by its virtual index. Keys never repeat, so a card element is never
   reused for another position — no wrap, no teleport to catch when scrolling
   fast. Cards mount and unmount beyond the screen edge.
-- **Slot geometry**: slot ±1 is parked with its centre on the viewport edge —
-  half the card on screen, half cut off — so the distance is viewport-relative
-  (`innerHeight / 2`), not a fixed pixel gap. Slot ±2 is a full card height
+- **Slot geometry**: slot ±1 is parked with its centre on the viewport edge,
+  pushed out by `SLOT_NUDGE` × the card's height (0.165 — 60px on the 366px
+  desktop card) so the gap to the centre card keeps its proportion on every
+  screen; the distance is viewport-relative (`innerHeight / 2`), not a fixed
+  pixel gap. The intro is a layout effect that runs before `measure()`, so it
+  reads the card's height itself. Slot ±2 is a full card height
   beyond that, off screen, and is where cards mount and unmount.
 - Centre card is `CENTER_SCALE` (1.3x); depth is carried by scale and a
   depth-of-field blur. The ramps (`SCALE_RAMP`, `OPACITY_RAMP`, `BLUR_RAMP`) are
@@ -98,7 +106,108 @@ reference but is commented out.
   a time with a spin that unwinds on landing, on an uneven dealer's rhythm
   (`INTRO_BEATS`). Respects `prefers-reduced-motion`. Queued intro tweens are
   killed explicitly if you scroll early — a delayed tween isn't "active", so
-  GSAP's `overwrite: "auto"` won't catch it.
+  GSAP's `overwrite: "auto"` won't catch it. An interrupted intro doesn't cut
+  to the live poses: `endIntro()` reads each card's pose back out of gsap and
+  the frame loop blends from there over `HANDOVER_MS`.
+- **Cards are placed once.** The card refs are inline, so React detaches and
+  re-attaches them on every render; `placedRef` makes sure only a newly mounted
+  card gets `placeCard()`, which would otherwise stamp the live pose over a
+  blend for a frame.
+- **Cursor tilt** — the whole stack leans toward the pointer anywhere over
+  `deck-stage`, not only over the centre card — up to `TILT_MAX_Y` (4°,
+  left/right) and `TILT_MAX_X` (3.5°, up/down) at the section's edge, eased
+  with `gsap.quickTo`. Small on purpose: a magazine turned in the hand, not a
+  trading card. It sets the viewing angle the paper's reflections answer,
+  never the light. The frame carries its own `TILT_PERSPECTIVE` (1100px) —
+  also where the paper's eye is. It rotates `deck-frame`, never the cards: the
+  frame loop owns every card's transform and would overwrite it. Mouse and
+  pen only, off under reduced motion. The return to flat goes through the same
+  quickTo — overwriting it with a separate tween leaves quickTo driving a dead
+  tween.
+- **Two layers, one job each.** The DOM is the carousel — every card is an
+  element the deck places, scales, blurs, fades and deals. What a card
+  *shows* is a sheet of paper drawn in WebGL by `lib/magazinePaper.ts` into
+  `<canvas data-paper-canvas>` inside it. Until that sheet has been drawn, or
+  without WebGL 2 (or on a lost context), the card shows its DOM face
+  (`[data-face]`: the image, the scrim and `.card-paper`'s static finish).
+  `data-paper` on the card is the switch, set only after a successful draw,
+  so there's never a blank frame. There is no CSS bend any more.
+- **One renderer for the whole deck.** Offscreen, one geometry, two materials
+  (printed face, underside) sharing one uniform set, a shadow material, and a
+  texture per project. Drawing a card sets its uniforms, renders, and copies
+  into its canvas in the same task. The canvas inherits every transform the
+  deck gives the card, so it's aligned by construction — never position it
+  beyond the margins the renderer reports (`paper.margins`, for the curl's
+  room and the shadow). Cards past `PAPER_RADIUS` hand their canvas back;
+  past `PAPER_SHARP_RADIUS` (blurred anyway) they draw at half resolution.
+  - The camera is an **off-axis frustum through the canvas's rectangle**, from
+    where the page's eye really is relative to this card — so the flat sheet
+    maps exactly onto the canvas and only relief moves off it.
+  - Artwork loads through `/_next/image` (same-origin, no CORS), as an sRGB
+    texture, clamped, mipmapped, anisotropic, object-cover cropped in the
+    shader. The scrim (`from-black/70 … to-black/20`) is mixed in sRGB like
+    the CSS gradient it replaces, so a flat card is pixel-for-pixel its
+    artwork plus the coat.
+  - The paper loop is a ticker callback registered *after* the frame loop, so
+    it draws this frame's positions and curl, and it only draws when a card's
+    offset, the tilt, the curl or the hover zoom changed. The centre card's
+    hover zoom lives here now (`HOVER_ZOOM`).
+  - `dispose()` forces a context loss; the lost handler ignores it, or
+    StrictMode's discarded instance would switch the live one off.
+- **Paper flex** — while the deck moves, the sheets flex like paper pushed
+  through air. The frame loop measures the deck's speed from `positionRef`
+  and a curl chases it through a spring (`BEND_STIFFNESS` / `BEND_DAMPING`,
+  ζ≈0.6 — one small flick past flat, no wobble), capped at `BEND_MAX`, weaker
+  for touch (`BEND_TOUCH_SCALE`), zero under reduced motion; only cards within
+  `BEND_RADIUS` flex. The shape is the vertex shader's
+  (`lib/magazinePaperShader.ts`): the trailing edge curls back with the curl
+  growing as distance² from the leading edge — integrated along the sheet so
+  it keeps its length — the leading edge runs ahead (`BEND_LEAD`), the sheet
+  bows slightly across its width and a faint ripple runs down the curl. At
+  rest the geometry is exactly flat. Scroll down → the bottom edges curl.
+  - **Thickness** is an underside sheet one paper-thickness behind the face,
+    in the stock colour, that only exists while the sheet bends — flat, it
+    would peek past the face as a hairline on the off-centre cards. It's
+    polygon-offset back and the depth range hugs the card; with a near plane
+    at 1px it fought the face in white shards.
+  - **Never clamp the curl's arc length to the sheet.** The mesh has a 2px
+    antialiasing pad past both edges; clamped, the pad collapsed onto the
+    edge, its normal normalised to NaN and the GPU dropped the edge rows of
+    triangles — any curl at all made the sheet ~6px shorter at each end, and
+    it popped back to size the instant the spring reached exactly 0.
+- **Shadow** — cast in WebGL, two layers: a small, darker *contact* shadow
+  tucked under the sheet and a larger, lighter *ambient* one with a long tail
+  (`SHADOW_CONTACT` / `SHADOW_AMBIENT`). At each point it's cast from how high
+  that part of the sheet is above the surface — `SHADOW_LIFT` less the curl
+  (closed-form, no loop: it runs for every canvas pixel) less the tilt
+  (`SHADOW_TILT_LIFT`) — so lower is tighter and darker, higher softer and
+  further along the light. The offset comes from the studio's key light
+  (`keyLight()` inverts the HDRI lookup at `KEY_LIGHT_UV`, so shadow and
+  reflection agree: top-left light, shadow down-right), turned into the
+  card's frame by the tilt. It spreads with `uMotion` (the bend spring), and
+  fades out over the canvas's last 16px (`uBounds`) so its edge never shows.
+  The footprint follows the flexing sheet (the curl integral, on the CPU).
+  **This was the border bug:** a CSS box-shadow is fixed to the card's rest rectangle, so as
+  the paper curled away the uncovered rectangle showed as a pale ghost card
+  ringed by shadow. `.card-edge` now applies only to the flat DOM face.
+- **Studio light** — image-based, from a studio HDRI baked by
+  `scripts/bake-studio-env.py` into three prefiltered equirects in
+  `public/env/` (coat ~2°, sheen ~12°, diffuse ~45°). Fixed in the room; the
+  reflection moves only because the paper does (deck travel, tilt, flex).
+  - A card only reflects a narrow cone of the room behind the viewer (about
+    ±14° × ±11°), so `ENV_YAW` / `ENV_PITCH` aim one light into it: the
+    studio's square LED panel, whose corner rests on the centred card's top
+    left. Aim by rendering `env()` over a wide window, not by guessing.
+  - The coat: Schlick Fresnel (F0 0.04) × the studio at two roughnesses, plus
+    a grazing lift; the paper under it is lit by the diffuse map *relative to
+    the flat card*, so only a bend changes the print. `EXPOSURE` is low on
+    purpose — the panel is ~25× the floor, and a higher value fogs the print
+    with the room.
+  - The paper is a height field (fibre, tooth, orange peel) tipping the normal
+    a fraction of a degree; its frequency is capped under the canvas's Nyquist
+    limit, or it aliases into a moiré. Off on coarse pointers.
+  - The baked maps are read top row first: `HDRLoader` sets `flipY`, which is
+    turned off.
 - Tunable constants live at the top of the file: `CENTER_SCALE`, `SLOT_NUDGE`,
   `OFFSCREEN_STEP`, `DURATION`/`EASE`, and the `INTRO_*` set.
 
@@ -147,14 +256,32 @@ Invisible Arc (bottom half): Top cards → Bottom cards (instant, opacity 0)
   - Size and tracking interpolate in CSS against a `--u` custom property
     (`.rs-*` rules in globals.css); colour and opacity are written inline by the
     same pass. First render computes the rest values inline so SSR matches.
+- **Five cards on show** (`VISIBLE_RADIUS` 2). `SLOT_RADIUS` is one more, so
+  the card gliding in has a slot to come from; `slotFade()` takes a slot to 0
+  over its last card of travel past the visible radius, and `slotShown()`
+  turns its clicks off (`inert` at rest).
+- **The gap is `ITEM_HEIGHT`** (180px) — it sets the slot height inline and
+  the glide distance, so change it nowhere else. At that pitch the outer cards
+  reach the header on a 900px-tall screen, which is why the viewport carries
+  `rs-edge-fade` (a top/bottom mask, depth `--rs-edge-fade`).
+- **Only the centre slot opens.** It's a `SlideLink` to `/project/<slug>`
+  with the project's title as the label — the same pair the deck's centre card
+  passes to `slideTo`, so the two always open the same case study. Every other
+  slot is a `<button>` that calls `onGoToIndex` and brings its project to the
+  centre; click it again once it's there to open it.
 - Color swatches on active item
 
 ### LeftSidebar.tsx
 - Navigation menu (WORK, ABOUT, PLAYGROUND, CONTACT)
-- Project metadata grid (Role, Launch, Recognition)
-- Large project counter — the number alone, centred on the **screen** via
-  `left-0 w-screen flex justify-center` — the aside is only 3 of 12 columns but
-  starts at the viewport edge. Never centre it with `-translate-x-1/2` or
+- Project metadata (`rail-left-meta`) — Role, then Launch, as a ruled list in
+  the bottom-left corner: a rule above each row, the label on the left, the
+  value right-aligned. Anchored by its foot, so a role that wraps grows the
+  block upward. Recognition is not shown. The case study's rail is *not* set
+  this way — it keeps its unruled label/value grid.
+- Large project counter — the number alone, centred on the **card** via
+  `left-[var(--card-shift)] w-screen flex justify-center` — the aside is only
+  3 of 12 columns but starts at the viewport edge, and `--card-shift` is how
+  far the deck sits off the screen's centre. Never centre it with `-translate-x-1/2` or
   `position: fixed`: both create a stacking context, and the counter's
   `mix-blend-difference` would then blend against that instead of `main`'s
   background and the cards, rendering the number solid white.
@@ -167,6 +294,8 @@ Invisible Arc (bottom half): Top cards → Bottom cards (instant, opacity 0)
 - Paper flip/page turn sounds
 - Bandpass filtered noise + triangle oscillator
 - Direction-aware frequency sweeps
+- Nothing switches it on at the moment: it starts off, and the audio toggle
+  went with the header. `playDeckSound` is still called and does nothing.
 
 ## The case study route
 
@@ -188,6 +317,11 @@ carries its own scroller rather than fighting that rule.
 - **Below `compact` the page restructures**: the scroller becomes
   `flex flex-col` purely so the title can be `order-first` while staying last in
   the DOM, the rail and minimap return to the flow, and the minimap is hidden.
+- **The title is inverted** against the page and the shots with
+  `mix-blend-difference`, like the deck's counter. The blend sits on
+  `case-study-title` itself, not on the `h1`: `sticky` + `z-20` makes the
+  wrapper a stacking context, and a blend nested inside it would be isolated
+  from the shots and render solid white.
 
 ### The two fades
 `HeavyScroll` publishes two custom properties on the scroller and everything
@@ -253,7 +387,19 @@ The source of truth is `:root` in `src/app/(frontend)/globals.css`.
   - Surfaces: `canvas`, `canvasDeep`, `canvasDark`, `surface` (card back)
   - Text: `ink`, `inkMuted`, `inkSubtle`, `inkPlain` (list items off centre),
     `invert`
-  - Accents: `accentDot`, `--color-grain`
+  - Accents: `accentDot`, `--color-grain`, `--color-gloss` (the varnish on
+    a flat DOM card face), `--color-stock` (the paper's underside and edge),
+    `--color-shadow`
+- **The card's size** is `--card-width` / `--card-height`. From 1100px up it
+  is at most 488 × 366, grown from the old 320 × 240 **to the left only** —
+  `--card-shift` moves `deck-frame` (by CSS `left`, since gsap owns its
+  transform) so the centre card's right edge stays put; the shift is scaled
+  by `--card-centre-scale`, which must match `CENTER_SCALE`. Below 1100 the
+  stacked layout keeps the small 4:3 steps; under 640 the card is `46.5vw`,
+  which puts the centre card at about 60% of a phone's width. The shift then closes a fifth of
+  the gap to the right rail (`+ 5vw - anchor/2 × scale / 5`: the deck's
+  column spans 25–75% of the screen). The work counter and `deck-hint` follow
+  `--card-shift`, so both stay centred on the card.
 - **Case study layout** is tokenized too: `--shot-width` (45vw less 10%, floored so the
   column never runs under the fixed rail), `--shot-lead` (the grid track that
   puts it on the *viewport* centre rather than its own track) and `--shot-top`
@@ -312,10 +458,10 @@ strings against source files.
 | Region | Markers |
 |--------|---------|
 | Shell | `app-shell`, `app-viewport`, `route-content`, `route-transition` |
-| Chrome | `chrome-header`, `chrome-contact`, `chrome-status`, `chrome-audio`, `chrome-brand`, `chrome-nav` |
-| Left rail | `rail-left`, `rail-left-nav`, `rail-left-meta`, `work-counter`, `scroll-hint` |
+| Chrome | `chrome-nav` |
+| Left rail | `rail-left`, `rail-left-nav`, `rail-left-meta`, `work-counter` |
 | Right rail | `rail-right`, `rail-right-viewport`, `rail-right-track`, `rail-right-slot`, `rail-right-swatches`, `rail-right-showreel` |
-| Deck | `deck-stage`, `deck-frame`, `deck-card`, `deck-hint` |
+| Deck | `deck-scroller`, `deck-stage`, `deck-frame`, `deck-card`, `deck-hint` |
 | Below 1100 | `menu-toggle`, `mobile-brand`, `mobile-counter`, `mobile-detail`, `mobile-swatches`, `mobile-menu`, `mobile-menu-nav`, `mobile-menu-footer` |
 | Case study | `case-study`, `case-study-body`, `case-study-rail`, `case-study-shots`, `case-study-shot`, `case-study-minimap`, `case-study-title`, `case-study-next` |
 | Overlays | `grain-overlay`, `toast` |
@@ -324,6 +470,7 @@ strings against source files.
 tokens; these exist only to identify. The styled non-Tailwind classes are a
 separate, named set — `page-canvas`, `rs-*`, `counter-numeral`, `title-wide`,
 `font-display` / `font-text`, `fade-on-scroll` / `fade-at-end`,
+`card-paper`, `card-edge`,
 `perspective-stage`, `no-scrollbar` — and those do
 carry rules in globals.css.
 
@@ -344,33 +491,115 @@ custom property.
 
 Below `compact` the whole layout changes: both sidebars are hidden and
 `MobileChrome` renders the stacked variant instead — deck, project detail
-beneath it, page number under the menu button. The header's contact line also
-collapses to a paper-plane icon there.
+beneath it, then the swatches, then the page number (the numeral alone, no
+total), centred at the foot.
+
+There is no header at any width. The contact line, "Working globally", the
+audio toggle and the scroll hint were removed, and `TopHeader` with them. The
+address now appears only in the Contact panel and in the mobile menu's
+footer.
+
+`body` is `h-dvh`, not `h-screen`. On a phone `100vh` is the height with the
+browser's toolbar hidden, so while the bar was showing the page was taller
+than what was visible and the deck's centre sat below the real middle. The
+deck re-measures on `resize`, which fires as the bar comes and goes.
 
 Typography breakpoints on the reference use different boundaries again
 (display 23/29/40/60px stepping at 1200/1440/1920; body at 1100/1800). Not
 adopted — recorded here in case it comes up.
 
 ### Interactions
-Constants live at the top of `PortfolioClient.tsx`. `SCROLL_MODEL` picks between
-two implementations, both present in the file:
+The deck runs on **Lenis**, owned by `src/hooks/useDeckScroll.ts`; constants
+live at the top of that file.
 
-- **`'follow'` (in use)** — the wheel moves the position directly
-  (`WHEEL_TRAVEL_PER_CARD`, 140px per card) and the deck settles onto the
-  nearest card once the wheel is quiet for `WHEEL_SETTLE_MS` (70ms), easing over
-  `SNAP_DURATION` (0.32s). There is no threshold and no lock: inertia simply
-  keeps moving the deck, as a native scroll would, instead of being something to
-  tell apart from intent. Snappiness lives in the settle timings, not in
-  `WHEEL_TRAVEL_PER_CARD` — that governs the hand-to-card mapping.
-- **`'step'`** — the earlier model: measure a gesture, jump a whole number of
-  cards, then ignore input briefly to swallow inertia. Fine on a mouse wheel,
-  mechanical on a trackpad. Kept for comparison.
-- **Drag** is direct manipulation too — the card follows the pointer at
-  `DRAG_TRAVEL_PER_CARD` (220px per card) and settles on release.
-- **All three inputs must agree on direction.** Scrolling down, dragging up and
+- **A hidden scroller.** Lenis scrolls an element and the deck isn't one, so
+  `PortfolioClient` renders `deck-scroller` — fixed, invisible, click-through —
+  holding one very tall spacer parked at `SCROLL_ORIGIN`. Lenis scrolls that,
+  and each frame the offset becomes card units in `positionRef`. Lenis steps on
+  gsap's ticker, *prioritised*, so the deck never draws a frame-old position.
+- **Not `infinite` mode** — its `reset()` (end of every animation) re-reads the
+  wrapped scrollTop, so the unwrapped value jumps a whole loop and every card
+  changes key at once. The finite range is thousands of cards long and
+  re-bases on `SCROLL_ORIGIN` at rest once it drifts past `REBASE_DISTANCE`.
+- **Not `lenis/snap`** — it snaps to a finite list of points; any integer is a
+  card here. `settle` instead waits `SETTLE_MS` of quiet, then commits to the
+  next card **in the direction of travel** once the gesture is past
+  `COMMIT_THRESHOLD` (0.12) of one — so a mouse notch is exactly one card, a
+  small nudge springs back, and a trackpad's momentum is followed all the way
+  out. It aims from `lenis.targetScroll`, i.e. where Lenis is heading, never
+  more than `MAX_THROW_CARDS` away.
+- **Landing is a spring, never a tween.** A tween starts from rest on its own
+  curve, so the deck slowed under Lenis, paused, then got pulled in again — the
+  "unnatural snap". The spring (`SPRING_STIFFNESS` 11, `SPRING_DAMPING` 1 =
+  critical, no overshoot) inherits the deck's measured speed, so follow and
+  land are one motion. Every move that ends on a card — settle, drag release,
+  key, sidebar — goes through `goTo()`; retargeting mid-flight keeps the speed.
+- **Who owns `positionRef`.** Lenis, except while the spring or a mouse drag is
+  moving the deck (`manualRef`): then the hook writes it directly and ignores
+  Lenis's emits, and `handBack()` re-syncs Lenis when it's done. Lenis's offset
+  is rounded to device pixels by the DOM — a visible stutter on a slow landing.
+  New input fires `virtual-scroll` *before* Lenis applies it, which is where
+  the hand-back happens, so the new gesture continues from the spring's spot.
+- **Momentum tail.** Small wheel events (`MOMENTUM_TAIL_DELTA`) heading the way
+  the spring is already landing are swallowed — they're a trackpad's inertia
+  dribbling out, and handing back for them stalls the deck short of the card.
+- **Wheel** — `WHEEL_LERP` 0.085 and `WHEEL_MULTIPLIER` 0.72 (the huyml.co
+  feel; don't take lerp under 0.06), then `WHEEL_TRAVEL_PER_CARD` (260 scroll
+  px) per card. One event is clamped to `WHEEL_MAX_EVENT_DELTA` in Lenis's
+  `virtualScroll` hook (which may mutate the deltas).
+- **Touch** is Lenis's `syncTouch` — direct under the finger, with inertia on
+  release (`TOUCH_INERTIA_*`). It must stay on: the scroller is click-through,
+  so there's no native touch scroll for Lenis to fall back to. `touchMultiplier` puts it on the wheel's scale
+  at `DRAG_TRAVEL_PER_CARD` (300px) per card. CardDeck2 only resolves taps for
+  touch.
+- **Mouse / pen drag** is CardDeck2's pointer handlers → `dragStart` / `drag`
+  / `dragEnd`, written straight to `positionRef` (direct manipulation isn't
+  smoothed). Release is aimed `DRAG_THROW_MS` ahead and the spring starts at
+  the pointer's speed. Taking over stops Lenis's glide with
+  `lenis.stop(); lenis.start()` — `reset()` is private, and a `scrollTo` to
+  the current value is a no-op.
+- **Gating**: `enabled` is false while a section modal or the mobile menu is
+  open; `virtualScroll` then returns false so the input passes through
+  natively. Don't use `lenis.stop()` for this — a stopped Lenis still
+  `preventDefault`s the wheel, which would freeze the modal's own scrolling.
+  Horizontal-dominant gestures are also passed through (back/forward swipe).
+- **All inputs must agree on direction.** Scrolling down, dragging up and
   Arrow Down all go to `position - 1`, which brings the card below up into
-  centre. The arrows were once mapped the other way and fought the deck.
-- Keyboard: arrows and space, rate-limited by `STEP_COOLDOWN_MS`.
+  centre.
+- **Keyboard** (arrows, space) calls `step()`, which builds on the card the
+  deck is already heading for, so quick presses accumulate. Rate-limited by
+  `STEP_COOLDOWN_MS` in `PortfolioClient`.
+- There is no detent warp on the drawn position any more. It made the card
+  cross the midpoint at 2.4× the input speed, which under eased motion read as
+  a lurch; the landing spring does that job now.
+
+## Content and caching
+The frontend is **static, with no timer**. Nothing re-reads Payload until an
+editor changes something.
+
+- `getProjects()` (`src/lib/getProjects.ts`) reads the published projects and
+  falls back to `src/data/projects.ts` when the CMS is empty or unreachable.
+  It is wrapped in React's `cache`, so one render asks once however many
+  callers there are — a case study asks three times (its metadata, the
+  project, the next one).
+- `/project/[slug]` exports `generateStaticParams`, so every case study is
+  prerendered at build. Without it the route is rendered on demand for each
+  visit — a cold function, a fresh database connection and the query, all
+  before the first byte. A project published after the build renders on its
+  first visit and is cached from then on.
+- **Rebuilding is on demand.** `src/collections/revalidate.ts` holds two
+  Payload hooks — after a change, after a delete — wired into Projects,
+  Categories and Media. Either calls `revalidatePath('/', 'layout')`, marking
+  the whole frontend stale at once: the deck and every case study read the
+  same list (order, numbering, "next project"), so one edit can touch any of
+  them. Each page regenerates on its next visit. A draft autosave is skipped
+  unless the document was already published.
+- Neither page exports `revalidate`. Don't add one back to cure stale content
+  — find out why the hook didn't fire.
+- A build that can't reach the database bakes in the placeholder list, and
+  keeps it until someone saves in the admin or the site is redeployed.
+- `slideTo` prefetches the destination as the slide starts, so the route
+  change itself has nothing left to wait for.
 
 ## Projects Data
 8 portfolio projects (IDs 01-08):

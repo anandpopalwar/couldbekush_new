@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 import { anyone, authenticated } from "../access";
+import { revalidateAfterChange, revalidateAfterDelete } from "./revalidate";
 
 const webp = { format: "webp" as const, options: { quality: 80 } };
 
@@ -11,6 +12,10 @@ export const Media: CollectionConfig = {
     create: authenticated,
     update: authenticated,
     delete: authenticated,
+  },
+  hooks: {
+    afterChange: [revalidateAfterChange],
+    afterDelete: [revalidateAfterDelete],
   },
   fields: [
     {

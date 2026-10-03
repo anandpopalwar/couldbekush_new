@@ -135,6 +135,10 @@ export default function Template({ children }: { children: React.ReactNode }) {
       }
 
       pendingHrefRef.current = href;
+      // The slide takes well over a second to cover and name the page; fetch
+      // the destination during it so the route change itself has nothing to
+      // wait for.
+      router.prefetch(href);
       // Left where the arriving instance can pick it up.
       setPendingTransition(href, nextLabel);
       setLabel(nextLabel);

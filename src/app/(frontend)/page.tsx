@@ -1,8 +1,8 @@
 import { getProjects } from '@/lib/getProjects';
 import { PortfolioClient } from '@/components/portfolio/PortfolioClient';
 
-// Re-read published projects from Payload at most once a minute in production.
-export const revalidate = 60;
+// Static until an editor changes something: the Payload hooks in
+// src/collections/revalidate.ts mark the site stale on publish, edit or delete.
 
 export default async function PortfolioPage() {
   const projects = await getProjects();

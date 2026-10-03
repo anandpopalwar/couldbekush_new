@@ -552,6 +552,34 @@ live at the top of that file.
   cross the midpoint at 2.4× the input speed, which under eased motion read as
   a lurch; the landing spring does that job now.
 
+## Content and caching
+The frontend is **static, with no timer**. Nothing re-reads Payload until an
+editor changes something.
+
+- `getProjects()` (`src/lib/getProjects.ts`) reads the published projects and
+  falls back to `src/data/projects.ts` when the CMS is empty or unreachable.
+  It is wrapped in React's `cache`, so one render asks once however many
+  callers there are — a case study asks three times (its metadata, the
+  project, the next one).
+- `/project/[slug]` exports `generateStaticParams`, so every case study is
+  prerendered at build. Without it the route is rendered on demand for each
+  visit — a cold function, a fresh database connection and the query, all
+  before the first byte. A project published after the build renders on its
+  first visit and is cached from then on.
+- **Rebuilding is on demand.** `src/collections/revalidate.ts` holds two
+  Payload hooks — after a change, after a delete — wired into Projects,
+  Categories and Media. Either calls `revalidatePath('/', 'layout')`, marking
+  the whole frontend stale at once: the deck and every case study read the
+  same list (order, numbering, "next project"), so one edit can touch any of
+  them. Each page regenerates on its next visit. A draft autosave is skipped
+  unless the document was already published.
+- Neither page exports `revalidate`. Don't add one back to cure stale content
+  — find out why the hook didn't fire.
+- A build that can't reach the database bakes in the placeholder list, and
+  keeps it until someone saves in the admin or the site is redeployed.
+- `slideTo` prefetches the destination as the slide starts, so the route
+  change itself has nothing left to wait for.
+
 ## Projects Data
 8 portfolio projects (IDs 01-08):
 | ID | Title | Category |

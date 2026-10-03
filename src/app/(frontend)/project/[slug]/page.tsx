@@ -7,9 +7,18 @@ import { ProjectChrome } from '@/components/portfolio/ProjectChrome';
 import { PageEnter } from '@/components/portfolio/PageEnter';
 import { HeavyScroll } from '@/components/portfolio/HeavyScroll';
 
-export const revalidate = 60;
-
 type Params = { params: Promise<{ slug: string }> };
+
+// Without this the route is rendered on demand for every visit — a cold
+// function, a fresh database connection and the query, all before the first
+// byte. With it each case study is built ahead of time and served as a static
+// page, rebuilt only when an editor changes content (see
+// src/collections/revalidate.ts). A project published after the build is
+// still rendered on its first visit and cached from then on.
+export async function generateStaticParams() {
+  const projects = await getProjects();
+  return projects.map((p) => ({ slug: p.slug }));
+}
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;

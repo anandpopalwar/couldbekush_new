@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { getPayload } from "payload";
 import config from "@payload-config";
 import type { Media, Project as PayloadProject } from "@/payload-types";
@@ -46,7 +47,9 @@ const toPortfolioProject = (p: PayloadProject, index: number): Project => {
  * The warning matters: a production deploy that logs it is serving placeholder
  * projects, which looks like a working site rather than a broken one.
  */
-export async function getProjects(): Promise<Project[]> {
+// Wrapped in React's cache: a case study asks for the list three times in one
+// render (metadata, the project, the next one), and each was its own query.
+export const getProjects = cache(async (): Promise<Project[]> => {
   try {
     const payload = await getPayload({ config });
     const { docs } = await payload.find({
@@ -69,11 +72,11 @@ export async function getProjects(): Promise<Project[]> {
     );
     return PROJECTS;
   }
-}
+});
 
 /**
  * One project by slug, for /project/[slug]. Reuses getProjects rather than
- * querying again: the list is already revalidated and cached, the deck is
+ * querying again: the list is already cached, the deck is
  * almost always rendered alongside, and eight projects is not worth a second
  * round trip. It also means the static fallback works here for free.
  */

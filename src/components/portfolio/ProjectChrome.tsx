@@ -1,29 +1,40 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { SlideLink } from '@/components/transition/SlideLink';
 import { MenuToggle } from '@/components/portfolio/MenuToggle';
 import { MobileMenu } from '@/components/portfolio/MobileMenu';
 import { useRouteSlide } from '@/app/(frontend)/template';
+import { NavSection } from '@/types/portfolio';
 
 /**
- * The site's furniture, kept on a case study so the page reads as part of the
- * site rather than a document it links out to: the menu. Same position as on
- * the deck, at both layouts.
+ * The site's furniture, kept on every page that isn't the deck — a case study,
+ * About — so each reads as part of the site rather than a document it links
+ * out to: the menu. Same position as on the deck, at both layouts.
  *
- * The nav sections open panels that belong to the deck, so from here every item
- * — in the desktop rail and in the stacked layout's full-screen panel alike —
- * returns home rather than trying to reproduce them.
+ * About is a page of its own. Playground and Contact are still panels that
+ * belong to the deck, so from here those — in the desktop rail and in the
+ * stacked layout's full-screen panel alike — return home rather than trying to
+ * reproduce them.
  */
 
-const NAV_ITEMS = ['Work', 'About', 'Playground', 'Contact'];
+// `label` is what the covering slide names on the way there; the trip home is
+// announced but paints nothing (see routeTransition.ts).
+const NAV_ITEMS: { id: NavSection; text: string; href: string; label: string }[] = [
+  { id: 'work', text: 'Work', href: '/', label: '' },
+  { id: 'about', text: 'About', href: '/about', label: 'About' },
+  { id: 'playground', text: 'Playground', href: '/', label: '' },
+  { id: 'contact', text: 'Contact', href: '/', label: '' },
+];
 
-export function ProjectChrome() {
+export function ProjectChrome({ active = 'work' }: { active?: NavSection }) {
   const { slideTo } = useRouteSlide();
+  const pathname = usePathname();
 
   // Menu state lives here rather than in a parent: on the deck it is owned by
   // PortfolioClient so the wheel and keyboard handlers can ignore input while
-  // the panel is open, but a case study has no such handlers to gate.
+  // the panel is open, but these pages have no such handlers to gate.
   const [menuOpen, setMenuOpen] = useState(false);
   // The panel outlives the dismiss request: `closing` runs its blur-out, and
   // only when that finishes is it unmounted — same dance as MobileChrome.
@@ -34,14 +45,20 @@ export function ProjectChrome() {
     setMenuOpen(false);
   }, []);
 
-  // Every section lives on the deck, so picking one from here goes home
-  // through the slide. Unmounted outright rather than played out: the panel
-  // would be animating over a page that is already leaving.
-  const goHome = useCallback(() => {
-    setClosing(false);
-    setMenuOpen(false);
-    slideTo('/', '');
-  }, [slideTo]);
+  // Picking a section from the panel goes there through the slide. The panel
+  // is unmounted outright rather than played out: it would be animating over a
+  // page that is already leaving. Picking the page you are on leaves the panel
+  // to close the ordinary way.
+  const goTo = useCallback(
+    (section: NavSection) => {
+      const item = NAV_ITEMS.find((entry) => entry.id === section);
+      if (!item || item.href === pathname) return;
+      setClosing(false);
+      setMenuOpen(false);
+      slideTo(item.href, item.label);
+    },
+    [slideTo, pathname],
+  );
 
   return (
     <>
@@ -51,16 +68,17 @@ export function ProjectChrome() {
         </span>
 
         <nav className="group flex flex-col items-start uppercase text-title-h5">
-          {NAV_ITEMS.map((item, i) => (
+          {NAV_ITEMS.map((item) => (
             <SlideLink
-              key={item}
-              href="/"
-              label=""
+              key={item.id}
+              href={item.href}
+              label={item.label}
               className="inline-flex items-center transition-all duration-200 group-hover:blur-[3px] hover:!blur-none"
             >
-              {/* Work is where this page came from, so it carries the marker. */}
-              {i === 0 && <span className="mr-1.5">→</span>}
-              <span>{item}</span>
+              {/* The marker sits on the section this page belongs to — Work,
+                  for a case study. */}
+              {item.id === active && <span className="mr-1.5">→</span>}
+              <span>{item.text}</span>
             </SlideLink>
           ))}
         </nav>
@@ -68,7 +86,7 @@ export function ProjectChrome() {
 
       {/* Below 1100 the rail is gone, so the stacked layout's chrome stands in
           for it — the same toggle and brand as the deck, in the same places, so
-          crossing between the two routes doesn't move the furniture. */}
+          crossing between the routes doesn't move the furniture. */}
       <MenuToggle
         open={menuOpen && !closing}
         onToggle={menuOpen ? () => setClosing(true) : () => setMenuOpen(true)}
@@ -82,8 +100,8 @@ export function ProjectChrome() {
 
       {menuOpen && (
         <MobileMenu
-          activeSection="work"
-          onSelectSection={goHome}
+          activeSection={active}
+          onSelectSection={goTo}
           onRequestClose={() => setClosing(true)}
           closing={closing}
           onClosed={finishClose}

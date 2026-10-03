@@ -15,7 +15,8 @@ still cite it as the source of a layout decision.)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS 3.4
 - **Animations**: GSAP 3.12
-- **WebGL**: Three.js — the deck's cards as paper, loaded on demand
+- **WebGL**: Three.js — the deck's cards as paper and the About page's foil
+  card, each loaded on demand
 - **Smooth scrolling**: Lenis 1.3 (the home deck's input — see Interactions)
 - **Icons**: Lucide React
 - **Fonts**: Google Sans Flex (everything), Google Sans Code (the mono line)
@@ -29,12 +30,15 @@ src/
 │   ├── page.tsx            # Main portfolio page (client component)
 │   ├── template.tsx        # The route transition, both halves — useRouteSlide()
 │   ├── project/[slug]/     # The case study page
+│   ├── about/              # The About page — a foil card to turn and open
 │   └── globals.css         # Global styles, 3D perspective, shadows
 ├── components/
 │   ├── transition/
 │   │   └── SlideLink.tsx   # Anchor that navigates through the slide
+│   ├── about/
+│   │   └── FoilCards.tsx   # About's viewer: the stage, the rack, the details
 │   ├── portfolio/
-│   │   ├── ProjectChrome.tsx # The site's furniture on a case study
+│   │   ├── ProjectChrome.tsx # The site's furniture off the deck: case study, About
 │   │   ├── HeavyScroll.tsx # Weighted scroller; publishes the two fade vars
 │   │   ├── PageEnter.tsx   # Step 4 of the transition — the arrival bounce
 │   │   ├── LeftSidebar.tsx # Menu nav, project metadata, counter
@@ -46,7 +50,7 @@ src/
 │   │   ├── MobileMenu.tsx  # Full-screen menu for that layout
 │   │   ├── MenuToggle.tsx  # The two rules that morph into a cross
 │   │   ├── ProjectModal.tsx# Full project detail modal
-│   │   └── SectionModal.tsx# About, Playground, Contact modals
+│   │   └── SectionModal.tsx# Playground, Contact modals
 │   └── ui/
 │       ├── GrainOverlay.tsx # Film grain texture overlay
 │       └── Toast.tsx        # Toast notifications (nothing raises one now)
@@ -55,7 +59,9 @@ src/
 ├── lib/
 │   ├── routeTransition.ts  # Carries the destination name across the boundary
 │   ├── magazinePaper.ts    # The deck's shared WebGL paper renderer
-│   └── magazinePaperShader.ts # Its GLSL: flex, coat, shadow
+│   ├── magazinePaperShader.ts # Its GLSL: flex, coat, shadow
+│   ├── foilCards.ts        # About's cards: the artwork, drawn in code, and flat renders
+│   └── foilCardScene.ts    # About's 3D scene: one folded card on a table, lit
 ├── hooks/
 │   ├── useAudioFeedback.ts # Web Audio API paper flip sounds
 │   ├── useDeckScroll.ts    # Lenis-driven wheel/touch/drag + snapping for the deck
@@ -272,7 +278,9 @@ Invisible Arc (bottom half): Top cards → Bottom cards (instant, opacity 0)
 - Color swatches on active item
 
 ### LeftSidebar.tsx
-- Navigation menu (WORK, ABOUT, PLAYGROUND, CONTACT)
+- Navigation menu (WORK, ABOUT, PLAYGROUND, CONTACT). ABOUT leaves for
+  `/about` through the slide; PLAYGROUND and CONTACT still open `SectionModal`
+  over the deck.
 - Project metadata (`rail-left-meta`) — Role, then Launch, as a ruled list in
   the bottom-left corner: a rule above each row, the label on the left, the
   value right-aligned. Anchored by its foot, so a role that wraps grows the
@@ -369,6 +377,70 @@ Things that are load-bearing:
 - `route-content` must stay untransformed and keep `h-full` — the case study's
   scroller, rail and chrome are all `fixed`, and a transform on an ancestor
   makes them resolve against *it* instead of the viewport.
+- **`slideTo` ignores a link to the page you are on.** Pushing the current
+  path neither remounts the template nor changes `pathname`, so nothing would
+  carry the slide back down and the page would stay covered. `ProjectChrome`
+  renders such a link on About.
+
+## The About route
+
+`/about` — laid out like the deck it sits beside: the practice's details in the
+bottom-left corner (the same ruled list as `rail-left-meta`), an object in the
+middle, and what that object is on the right. The object is a folded hot-foil
+greeting card that can be turned in the hand and opened; a rack beneath it
+holds the five designs. Below `compact` the columns stack — stage, rack, the
+card's details, the practice — and the page scrolls in its own scroller, as a
+case study does. At `compact` and up everything fits and nothing scrolls.
+
+ABOUT in every menu goes here through the slide. It was a `SectionModal` panel
+before; Playground and Contact still are, so from a case study or from About
+those two return home.
+
+- **Three files.** `lib/foilCards.ts` is the artwork and the collection;
+  `lib/foilCardScene.ts` is the 3D scene; `components/about/FoilCards.tsx`
+  renders the page's two grid items (the stage column, the card's details) and
+  holds no 3D of its own.
+- **Nothing is an image.** Each design is drawn in code as white masks — foil,
+  ink, blind deboss — in units of `u`, 1% of the card's width, so one drawing
+  serves the 92px thumbnail and the 1024px texture. `flat()` tints the masks
+  for the rack and for the fallback where WebGL isn't available; the scene
+  bakes them into two textures per face: colour, and a data map with height in
+  R, roughness in G and metalness in B.
+- **The cards' colours are content, not tokens.** Stock, foil and ink are the
+  cards' own materials and live in `FOIL_CARDS` as data, like a project's
+  theme colours. Everything around the card is tokens; its shadows read
+  `--color-shadow` and `--card-shadow-strength`.
+- **The lettering is the site's typeface**, read from `--font-google-sans` /
+  `--font-google-sans-code` rather than named. The designs were drawn around a
+  narrower serif italic, so `TYPE_SCALE` (0.84) sets every size down to keep
+  each line its length. A canvas doesn't wait for a font — `cardFontsReady()`
+  has to resolve before anything is drawn.
+- **The scene owns its canvas.** It creates one per instance and appends it to
+  the stage rather than being handed one by React: StrictMode mounts effects
+  twice and `dispose()` forces a context loss, so a second scene must never
+  inherit the context the first one gave up. Three loads from `create()`, which
+  returns null without WebGL 2 — the viewer then goes flat and only "Turn over"
+  is lost.
+- **Ported from three r128 to r186, where three things mean something else:**
+  - Lights are physical. The directional and hemisphere intensities are the
+    old values × π, and the pointer's glint is in candela.
+  - Colour management is on. The studio's panels and lights were authored as
+    linear values, so they are set with `LinearSRGBColorSpace`; the stock's
+    hex is sRGB and converts by itself.
+  - A bump map is read per *screen pixel*, not per world unit. `BUMP_DEPTH` is
+    the stamp's depth in world units and the frame loop multiplies it by the
+    card's size on screen — a fixed `bumpScale` would deepen the relief as the
+    card got smaller.
+- **The die-cut window** is an alpha map on both faces of the cover. r186's
+  shadow pass honours `alphaMap` + `alphaTest` by itself; no
+  `customDepthMaterial`.
+- **The first card is baked a face at a time** (`boot()`), yielding between
+  faces so the page arriving under the slide stays smooth, and then slides in
+  like any later one. A change of card bakes all four faces in one go, while
+  nothing is on screen. Coarse pointers bake at 768px wide instead of 1024.
+- **State lives in the scene.** It reports `{ index, open, turned }` and the
+  component only labels its buttons from that. Until the scene exists, and
+  without WebGL, the component keeps `index` and `open` itself.
 
 ## Design System
 
@@ -464,6 +536,7 @@ strings against source files.
 | Deck | `deck-scroller`, `deck-stage`, `deck-frame`, `deck-card`, `deck-hint` |
 | Below 1100 | `menu-toggle`, `mobile-brand`, `mobile-counter`, `mobile-detail`, `mobile-swatches`, `mobile-menu`, `mobile-menu-nav`, `mobile-menu-footer` |
 | Case study | `case-study`, `case-study-body`, `case-study-rail`, `case-study-shots`, `case-study-shot`, `case-study-minimap`, `case-study-title`, `case-study-next` |
+| About | `about-page`, `about-body`, `about-stage-column`, `about-stage`, `about-hint`, `about-rack`, `about-dossier`, `about-meta` |
 | Overlays | `grain-overlay`, `toast` |
 
 **They carry no styles and must not be given any.** Styling lives in Tailwind

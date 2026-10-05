@@ -326,7 +326,10 @@ carries its own scroller rather than fighting that rule.
   `flex flex-col` purely so the title can be `order-first` while staying last in
   the DOM, the rail and minimap return to the flow, and the minimap is hidden.
 - **The title is inverted** against the page and the shots with
-  `mix-blend-difference`, like the deck's counter. The blend sits on
+  `mix-blend-difference`, like the deck's counter — from `compact` up only.
+  Below it the title is plain `text-ink`: it is the page's own heading on the
+  page ground, and the blend sometimes rendered it solid white on a phone.
+  The rail's "Visit site" link is ink too, not the project's colour. The blend sits on
   `case-study-title` itself, not on the `h1`: `sticky` + `z-20` makes the
   wrapper a stacking context, and a blend nested inside it would be isolated
   from the shots and render solid white.
@@ -451,8 +454,17 @@ those two return home.
   card. A drag there is read straight across, not along the diagonal. The
   page's UI is the same as on the stacked layout.
 - **One float drives the track.** `progress`, in card units: an integer puts
-  that card at the front. Input moves `target` and the track eases after it.
-  The wheel snaps once it has gone quiet (`WHEEL_SNAP_MS`); a drag is read
+  that card at the front.
+  The wheel and the arrow keys are a stepper — one push or press moves
+  exactly one card on a timed move (`STEP_MS`, 650ms, ease-out: fast away,
+  slow to settle). A new push is taken once the move has run
+  `REARM_AFTER_MS` (200ms) and carries on from wherever the track is, so
+  quick pushes chain; earlier ones are dropped, never queued. Each mouse
+  notch is a push (a delta of `NOTCH_MIN` or more arriving alone, or repeating
+  exactly). A trackpad gesture is one push until `QUIET_MS` of quiet, or until
+  a delta rises to `REARM_RATIO` × the lowest since its momentum peaked. A tap
+  on a side card is a timed jump. Only a drag is free, and only its release
+  uses the eased settle: a drag is read
   along the track's own diagonal and thrown on release; a tap on the front
   card opens it, on any other brings it forward; the open card closes as soon
   as the track heads elsewhere. The wheel listener is on `window` and calls
@@ -496,6 +508,28 @@ those two return home.
     the stamp's depth in world units, and the frame loop turns it into each
     card's `bumpScale` from that card's own distance — a fixed value would
     deepen the relief on the far cards.
+- **Nothing follows the cursor but the card under it.** There is no parallax
+  and no idle drift: a mouse or pen over a card tips that one card — the side
+  under the cursor dips away, up to `HOVER_TILT` at its edge — and it eases
+  back when the mouse leaves (`HOVER_RATE`). The glint rests at `GLINT_REST`
+  and follows the mouse only over a card. No hover on touch, while dragging,
+  or (the tilt) under reduced motion. A still mouse off the cards leaves the
+  picture exactly still.
+- **A drag on the front card spins it.** Mouse, pen or touch, and only with
+  the track at rest: each move turns the card about the axis at right angles
+  to it (`SPIN_RATE` radians per px), and on release it eases back to rest
+  over `SPIN_BACK_MS`. A drag that starts anywhere else — a side card, empty
+  space — scrolls the track, so on a phone the carousel is swiped beside or
+  below the front card. The hover tilt stays mouse and pen only. The stage is
+  `touch-none`, so the browser never scrolls or zooms under it. The spin is a quaternion
+  of the card's own, applied over the hover tilt and the lean.
+- **A drag belongs to one pointer.** Moves and releases from any other are
+  ignored, and a second finger landing ends the first one's drag properly
+  first. Left open, a card it had spun was never told to ease back and stayed
+  turned — edge-on, a thin pale line across the screen.
+- **A track drag is anchored when it starts to move**, not when the press
+  lands: a step can run on under a held press, and anchoring at the press
+  threw the track back a card.
 - **The die-cut window** is an alpha map on both faces of the cover.
 - **Building.** `boot()` bakes the paper map and the front card a step at a
   time, so the page arriving under the slide stays smooth; the rest of the

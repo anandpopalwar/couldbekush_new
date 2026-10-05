@@ -31,52 +31,6 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   };
 }
 
-/**
- * The project's accent, from its own theme colours.
- *
- * Prefers the most saturated colour that is still legible on the canvas, and
- * falls back to the darkest. The name is set at 11.5vw in this colour, so a
- * washed-out pick would be the most visible mistake on the page — and the
- * palettes come from the work, not from this design.
- */
-function accentFrom(colors?: string[]) {
-  const parse = (hex: string) => {
-    const raw = hex.replace('#', '');
-    const full =
-      raw.length === 3
-        ? raw
-            .split('')
-            .map((c) => c + c)
-            .join('')
-        : raw;
-    if (full.length !== 6) return null;
-    const n = Number.parseInt(full, 16);
-    if (Number.isNaN(n)) return null;
-    return [(n >> 16) & 255, (n >> 8) & 255, n & 255] as const;
-  };
-
-  const scored = (colors ?? [])
-    .map((hex) => {
-      const rgb = parse(hex);
-      if (!rgb) return null;
-      const [r, g, b] = rgb;
-      const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-      const max = Math.max(r, g, b);
-      const min = Math.min(r, g, b);
-      const saturation = max === 0 ? 0 : (max - min) / max;
-      return { hex, luminance, saturation };
-    })
-    .filter((c): c is NonNullable<typeof c> => c !== null);
-
-  if (!scored.length) return undefined;
-
-  const legible = scored.filter((c) => c.luminance <= 0.72);
-  const pool = legible.length ? legible : scored;
-  return [...pool].sort(
-    (a, b) => b.saturation - a.saturation || a.luminance - b.luminance,
-  )[0].hex;
-}
-
 export default async function ProjectPage({ params }: Params) {
   const { slug } = await params;
   const project = await getProject(slug);
@@ -85,7 +39,6 @@ export default async function ProjectPage({ params }: Params) {
   const projects = await getProjects();
   const index = projects.findIndex((p) => p.slug === project.slug);
   const next = projects[(index + 1) % projects.length];
-  const accent = accentFrom(project.themeColors);
 
   const images = [project.image, ...(project.gallery ?? [])].filter(Boolean);
 
@@ -169,10 +122,7 @@ export default async function ProjectPage({ params }: Params) {
                 href={project.liveUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-label-xs w-fit border-b pb-1 hover:opacity-60 transition-opacity"
-                style={
-                  accent ? { color: accent, borderColor: accent } : undefined
-                }
+                className="text-label-xs w-fit border-b border-ink pb-1 text-ink hover:opacity-60 transition-opacity"
               >
                 Visit site →
               </a>
@@ -241,11 +191,14 @@ export default async function ProjectPage({ params }: Params) {
           flow above the details, and it scrolls away with everything else
           (`fade-on-scroll` is scoped to compact+ in globals.css for exactly
           that reason, or it would dissolve the moment you moved).
-          Inverted against the page and the work, like the deck's counter. The
+          Below compact it is plain ink: nothing is behind it there but the
+          page, and the blend sometimes came out solid white on a phone.
+          From compact up it is
+          inverted against the page and the work, like the deck's counter. The
           blend sits on this element, not on the h1: sticky + z-20 makes this a
           stacking context, and a blend nested inside it would be isolated from
           the shots and render solid white. */}
-      <div className="case-study-title fade-on-scroll order-first compact:order-none static compact:sticky bottom-0 z-20 pointer-events-none px-6 pt-56 pb-0 text-center compact:px-12 compact:pt-0 compact:pb-2 compact:text-right text-invert mix-blend-difference">
+      <div className="case-study-title fade-on-scroll order-first compact:order-none static compact:sticky bottom-0 z-20 pointer-events-none px-6 pt-56 pb-0 text-center compact:px-12 compact:pt-0 compact:pb-2 compact:text-right text-ink compact:text-invert compact:mix-blend-difference">
         <h1 className="title-wide text-[length:var(--project-title-size)] leading-[0.78] uppercase tracking-tight">
           {project.title}
         </h1>

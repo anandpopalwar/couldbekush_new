@@ -326,7 +326,10 @@ carries its own scroller rather than fighting that rule.
   `flex flex-col` purely so the title can be `order-first` while staying last in
   the DOM, the rail and minimap return to the flow, and the minimap is hidden.
 - **The title is inverted** against the page and the shots with
-  `mix-blend-difference`, like the deck's counter. The blend sits on
+  `mix-blend-difference`, like the deck's counter — from `compact` up only.
+  Below it the title is plain `text-ink`: it is the page's own heading on the
+  page ground, and the blend sometimes rendered it solid white on a phone.
+  The rail's "Visit site" link is ink too, not the project's colour. The blend sits on
   `case-study-title` itself, not on the `h1`: `sticky` + `z-20` makes the
   wrapper a stacking context, and a blend nested inside it would be isolated
   from the shots and render solid white.
@@ -520,6 +523,10 @@ those two return home.
   below the front card. The hover tilt stays mouse and pen only. The stage is
   `touch-none`, so the browser never scrolls or zooms under it. The spin is a quaternion
   of the card's own, applied over the hover tilt and the lean.
+- **A drag belongs to one pointer.** Moves and releases from any other are
+  ignored, and a second finger landing ends the first one's drag properly
+  first. Left open, a card it had spun was never told to ease back and stayed
+  turned — edge-on, a thin pale line across the screen.
 - **A track drag is anchored when it starts to move**, not when the press
   lands: a step can run on under a held press, and anchoring at the press
   threw the track back a card.

@@ -225,8 +225,8 @@ interface TrackCard {
 }
 
 type Drag =
-  | { mode: 'track'; x: number; y: number; p: number; moved: boolean; v: number; t: number; unit: number }
-  | { mode: 'spin'; index: number; x: number; y: number; lx: number; ly: number; moved: boolean };
+  | { mode: 'track'; id: number; x: number; y: number; p: number; moved: boolean; v: number; t: number; unit: number }
+  | { mode: 'spin'; id: number; index: number; x: number; y: number; lx: number; ly: number; moved: boolean };
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 const mod = (a: number, n: number) => ((a % n) + n) % n;
@@ -881,7 +881,7 @@ export class FoilCardScene {
     this.pointer.mouse = e.pointerType === 'mouse' || e.pointerType === 'pen';
     const now = performance.now();
     const drag = this.drag;
-    if (!drag) return;
+    if (!drag || e.pointerId !== drag.id) return;
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
     if (!drag.moved) {
@@ -930,12 +930,17 @@ export class FoilCardScene {
   private onPointerDown = (e: PointerEvent) => {
     // On the front card, at rest, a drag — mouse, pen or touch — spins it;
     // anywhere else, a side card or empty space, it scrolls the track.
+    // One finger at a time: a second one ends the first's drag properly — left
+    // open, a card it had spun would never be told to ease back.
+    if (this.drag) this.onPointerCancel();
+    const id = e.pointerId;
     const index = this.hit(e);
     this.drag =
       index !== -1 && index === this.active && this.cards[index] && this.settled()
-        ? { mode: 'spin', index, x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, moved: false }
+        ? { mode: 'spin', id, index, x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, moved: false }
         : {
             mode: 'track',
+            id,
             x: e.clientX,
             y: e.clientY,
             p: this.progress,
@@ -953,7 +958,7 @@ export class FoilCardScene {
 
   private onPointerUp = (e: PointerEvent) => {
     const drag = this.drag;
-    if (!drag) return;
+    if (!drag || e.pointerId !== drag.id) return;
     this.drag = null;
     if (!drag.moved) {
       // A tap: the front card opens or closes, any other comes to the front.

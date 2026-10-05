@@ -8,8 +8,8 @@ import { type FaceLayers, LayerError, type ViewerCard } from './foilLayers';
  * The track runs from small and far in the lower left to large and near in
  * the upper right, with the front card centre stage. One float, `progress`,
  * in card units, says where it is: an integer puts that card at the front.
- * The wheel, a drag, the keys and the page's nav all move `target`, and the
- * track eases after it. Only the front card opens.
+ * The wheel and the keys step it one card at a time on a timed move; a drag
+ * moves it freely and it settles on the nearest card. Only the front card opens.
  *
  * A card is two thin boards hinged down the left edge. Its cover and the page
  * that carries the greeting are baked from lib/foilCards.ts's masks into two
@@ -18,7 +18,7 @@ import { type FaceLayers, LayerError, type ViewerCard } from './foilLayers';
  * matte cotton, and the light finds it as the card leans. The other two faces
  * are bare stock: one shared paper map, tinted. The light is a small studio
  * built in code: softboxes for the foil to reflect, a key light, and a glint
- * that follows the pointer. Nothing casts a shadow.
+ * that follows the mouse over a card. Nothing casts a shadow.
  *
  * The scene owns its canvas (appended to the stage it is given) and its own
  * frame loop, and reports back only what the page needs to label itself.
@@ -52,7 +52,8 @@ const ROOM = 0x0a0a0b;
 const HEMI_INTENSITY = 1.57;
 const KEY_INTENSITY = 3.61;
 const KEY_POSITION: Vec3 = [-2.4, 4, 4];
-// The glint that rides the pointer: candela, reach, falloff.
+// The glint: candela, reach, falloff. It rests at GLINT_REST and follows the
+// mouse only while a card is under it, GLINT_LIFT in front of the card.
 const GLINT: Vec3 = [6, 8, 2];
 
 // The track. One card's step along it, in world units — x, y and toward the
@@ -81,8 +82,18 @@ const FADE_HIDE = 0.002;
 const LEAN_AXIS = 0.38;
 const LEAN = -0.62;
 const FACING: [number, number] = [-0.04, -0.1];
-// How much the pointer tips a card, x then y: far cards, plus this for the front.
-const POINTER_TILT: [number, number] = [0.1, 0.16];
+// Only the card under the mouse tilts: the side under the cursor dips away,
+// by this many radians at the card's edge (about 11°). Nothing else follows
+// the cursor. HOVER_RATE is how quickly a card eases in and out, per second.
+const HOVER_TILT = 0.2;
+const HOVER_RATE = 6;
+const GLINT_REST = [0, 0.4, 2.2] as const;
+const GLINT_LIFT = 2.2;
+// A drag on the front card (mouse, pen or touch) spins it — radians per px — and it
+// eases back to rest on release. A drag anywhere else scrolls the track.
+const SPIN_RATE = 0.01;
+const SPIN_BACK_MS = 700;
+const SPIN_BACK_MS_REDUCED = 200;
 // How quickly the track catches its target, per second.
 const TRACK_RATE = 6.5;
 const TRACK_RATE_REDUCED = 18;
@@ -114,24 +125,35 @@ const PHONE_BAND = { centre: 0.4, fill: 0.72, width: 0.5, gap: 10 };
 // Just enough depth per step that a card nearer the front draws over the next.
 const CAROUSEL_DEPTH = 0.02;
 
-// Input. Wheel px per card is 1 / WHEEL_GAIN; one event is clamped, lines and
-// pages are turned into px, and the track snaps once the wheel has been quiet.
-const WHEEL_GAIN = 0.0032;
-const WHEEL_MAX = 140;
+// Input. The wheel and the arrow keys are a stepper: one push or one press is
+// one card, on a move of fixed length that starts fast and settles slowly.
+// A jump to a named card takes a little longer for each card it crosses.
+const STEP_MS = 650;
+const JUMP_MS_PER_CARD = 100;
+const JUMP_MS_MAX = 1100;
+const MOVE_MS_REDUCED = 200;
+// The earliest a new push can start the next move, which carries on from
+// wherever the track has got to.
+const REARM_AFTER_MS = 200;
+// A trackpad gesture steps once it has added up to WHEEL_THRESHOLD px, and is
+// over after QUIET_MS without an event.
+const WHEEL_THRESHOLD = 24;
+const QUIET_MS = 180;
+// A mouse-wheel notch: a big delta that arrives on its own, or repeats exactly.
+const NOTCH_MIN = 50;
+const NOTCH_GAP_MS = 60;
+// A fresh trackpad push: a delta that rises to REARM_RATIO × the lowest since
+// the momentum's peak. Lines and pages are turned into px.
+const REARM_RATIO = 2;
+const REARM_MIN = 12;
 const WHEEL_LINE = 18;
 const WHEEL_PAGE = 400;
-const WHEEL_SNAP_MS = 150;
-const WHEEL_GESTURE_MS = 220;
-// Past this share of a card, a wheel gesture moves at least one.
-const WHEEL_COMMIT = 0.1;
 // A press that travels further than this is a drag. A drag is read along the
 // track's own diagonal, and thrown on release.
 const TAP_SLOP_PX = 6;
 const DRAG_AXIS: [number, number] = [0.82, -0.57];
 const DRAG_THROW = 0.16;
 const DRAG_THROW_MAX = 1.6;
-// Left alone this long, the light drifts on its own so the foil keeps moving.
-const IDLE_MS = 2600;
 
 type Vec3 = [number, number, number];
 
@@ -194,11 +216,23 @@ interface TrackCard {
   reliefs: THREE_NS.MeshStandardMaterial[];
   edge: THREE_NS.MeshStandardMaterial;
   openP: number;
+  /** How far the hover has tipped it, -1 to 1 across and down. */
+  hx: number;
+  hy: number;
+  /** Its spin from being dragged, and the ease back to rest once let go. */
+  spin: THREE_NS.Quaternion;
+  spinBack: { from: THREE_NS.Quaternion; start: number } | null;
 }
+
+type Drag =
+  | { mode: 'track'; x: number; y: number; p: number; moved: boolean; v: number; t: number; unit: number }
+  | { mode: 'spin'; index: number; x: number; y: number; lx: number; ly: number; moved: boolean };
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 const mod = (a: number, n: number) => ((a % n) + n) % n;
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+// The track's timed moves: a fast start and a long settle.
+const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
 const smoothstep = (a: number, b: number, x: number) => {
   const t = clamp((x - a) / (b - a), 0, 1);
   return t * t * (3 - 2 * t);
@@ -300,12 +334,20 @@ export class FoilCardScene {
   private openFit = 1;
   private camDist = 0;
 
-  private readonly pointer = { x: 0, y: 0 };
-  private readonly smooth = { x: 0, y: 0 };
-  private lastMove = -1e9;
-  private lastWheel = 0;
-  private wheelAnchor = 0;
-  private drag: { x: number; y: number; p: number; moved: boolean; v: number; t: number; unit: number } | null = null;
+  // px inside the canvas; over: directly over it; mouse: a mouse or a pen.
+  private readonly pointer = { x: 0, y: 0, over: false, mouse: false };
+  private readonly hoverRay: THREE_NS.Raycaster;
+  private readonly hoverNdc: THREE_NS.Vector2;
+  private readonly glintGoal: THREE_NS.Vector3;
+  private readonly proj: THREE_NS.Vector3;
+  private readonly projEdge: THREE_NS.Vector3;
+  // A timed move — a step or a jump. Without one the track settles on `target`.
+  private anim: { from: number; to: number; start: number; dur: number } | null = null;
+  private readonly wheel = { last: -1e9, acc: 0, locked: false, prevAbs: 0, peak: 0, min: Infinity };
+  private drag: Drag | null = null;
+  private readonly rest: THREE_NS.Quaternion;
+  private readonly spinAxis: THREE_NS.Vector3;
+  private readonly spinStep: THREE_NS.Quaternion;
   private last = 0;
   private raf = 0;
 
@@ -363,7 +405,13 @@ export class FoilCardScene {
     key.position.set(...KEY_POSITION);
     this.scene.add(key);
     this.glint = new three.PointLight(linear(SKY), ...GLINT);
+    this.glint.position.set(...GLINT_REST);
     this.scene.add(this.glint);
+    this.hoverRay = new three.Raycaster();
+    this.hoverNdc = new three.Vector2();
+    this.glintGoal = new three.Vector3();
+    this.proj = new three.Vector3();
+    this.projEdge = new three.Vector3();
 
     // Hinged on its left edge, centred on its height.
     this.panel = new three.BoxGeometry(CW, CH, CT);
@@ -377,6 +425,9 @@ export class FoilCardScene {
     this.facing = new three.Quaternion().setFromEuler(new three.Euler(FACING[0], FACING[1], 0));
     this.turn = new three.Quaternion();
     this.tip = new three.Quaternion();
+    this.rest = new three.Quaternion();
+    this.spinAxis = new three.Vector3();
+    this.spinStep = new three.Quaternion();
     this.tipAngles = new three.Euler();
 
     stage.appendChild(this.canvas);
@@ -385,6 +436,7 @@ export class FoilCardScene {
     this.layout();
 
     window.addEventListener('pointermove', this.onPointerMove, { passive: true });
+    this.canvas.addEventListener('pointerleave', this.onPointerLeave);
     window.addEventListener('wheel', this.onWheel, { passive: false });
     stage.addEventListener('pointerdown', this.onPointerDown);
     stage.addEventListener('pointerup', this.onPointerUp);
@@ -401,12 +453,21 @@ export class FoilCardScene {
     const base = Math.round(this.target);
     let delta = mod(index - mod(base, count), count);
     if (delta > count / 2) delta -= count;
-    this.target = base + delta;
+    if (!delta) return;
+    this.close();
+    this.moveTo(
+      base + delta,
+      this.reduced
+        ? MOVE_MS_REDUCED
+        : Math.min(JUMP_MS_MAX, STEP_MS + JUMP_MS_PER_CARD * (Math.abs(delta) - 1)),
+    );
   }
 
-  /** One card along, from wherever the track is already heading. */
+  /** One card along. Ignored while a move has only just begun, or in the hand. */
   stepBy(direction: 1 | -1) {
-    this.target = Math.round(this.target) + direction;
+    if (!this.canStep() || this.drag?.moved) return;
+    this.close();
+    this.moveTo(Math.round(this.target) + direction, this.reduced ? MOVE_MS_REDUCED : STEP_MS);
   }
 
   toggleOpen() {
@@ -425,6 +486,7 @@ export class FoilCardScene {
     cancelAnimationFrame(this.raf);
     this.observer.disconnect();
     window.removeEventListener('pointermove', this.onPointerMove);
+    this.canvas.removeEventListener('pointerleave', this.onPointerLeave);
     window.removeEventListener('wheel', this.onWheel);
     this.stage.removeEventListener('pointerdown', this.onPointerDown);
     this.stage.removeEventListener('pointerup', this.onPointerUp);
@@ -459,8 +521,19 @@ export class FoilCardScene {
     this.emit();
   }
 
+  private moveTo(to: number, dur: number) {
+    this.anim = { from: this.progress, to, start: performance.now(), dur };
+    this.target = to;
+  }
+
+  private canStep() {
+    return !this.anim || performance.now() - this.anim.start >= REARM_AFTER_MS;
+  }
+
   private settled() {
     return (
+      !this.anim &&
+      !this.drag?.moved &&
       Math.abs(this.progress - Math.round(this.progress)) < SETTLED &&
       Math.abs(this.target - this.progress) < SETTLED
     );
@@ -741,7 +814,7 @@ export class FoilCardScene {
     // Placed by the next frame; until then it would sit on the front card.
     outer.visible = false;
     this.scene.add(outer);
-    return { outer, hinge, pivot, meshes: [backBoard, cover], reliefs, edge, openP: 0 };
+    return { outer, hinge, pivot, meshes: [backBoard, cover], reliefs, edge, openP: 0, hx: 0, hy: 0, spin: new three.Quaternion(), spinBack: null };
   }
 
   /** Put one card on the track. False if the scene is gone, or if the card
@@ -801,16 +874,46 @@ export class FoilCardScene {
   /* ── in the hand ───────────────────────────────────────────────────── */
 
   private onPointerMove = (e: PointerEvent) => {
-    this.pointer.x = clamp((e.clientX / window.innerWidth) * 2 - 1, -1, 1);
-    this.pointer.y = clamp((e.clientY / window.innerHeight) * 2 - 1, -1, 1);
+    const r = this.canvas.getBoundingClientRect();
+    this.pointer.x = e.clientX - r.left;
+    this.pointer.y = e.clientY - r.top;
+    this.pointer.over = e.target === this.canvas;
+    this.pointer.mouse = e.pointerType === 'mouse' || e.pointerType === 'pen';
     const now = performance.now();
-    this.lastMove = now;
     const drag = this.drag;
     if (!drag) return;
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
-    if (Math.hypot(dx, dy) > TAP_SLOP_PX) drag.moved = true;
-    if (!drag.moved) return;
+    if (!drag.moved) {
+      if (Math.hypot(dx, dy) <= TAP_SLOP_PX) return;
+      drag.moved = true;
+      if (drag.mode === 'track') {
+        // The hand takes the track from where it is now, not from where it
+        // was when the press began — a step may have run on in between.
+        this.anim = null;
+        drag.x = e.clientX;
+        drag.y = e.clientY;
+        drag.p = this.target = this.progress;
+        drag.t = now;
+        return;
+      }
+    }
+    if (drag.mode === 'spin') {
+      // A trackball: each move turns the card about the axis at right angles
+      // to the move, in screen space.
+      const mx = e.clientX - drag.lx;
+      const my = e.clientY - drag.ly;
+      const length = Math.hypot(mx, my);
+      drag.lx = e.clientX;
+      drag.ly = e.clientY;
+      const card = this.cards[drag.index];
+      if (!length || !card) return;
+      this.spinAxis.set(my / length, mx / length, 0);
+      this.spinStep.setFromAxisAngle(this.spinAxis, length * SPIN_RATE);
+      card.spinBack = null;
+      card.spin.premultiply(this.spinStep);
+      return;
+    }
     // Along the track: up and to the right brings the next card forward.
     // The carousel runs straight across; the tracks run on their diagonal.
     const along = this.mode === 'phone' ? dx : dx * DRAG_AXIS[0] + dy * DRAG_AXIS[1];
@@ -820,16 +923,27 @@ export class FoilCardScene {
     this.progress = this.target = position;
   };
 
+  private onPointerLeave = () => {
+    this.pointer.over = false;
+  };
+
   private onPointerDown = (e: PointerEvent) => {
-    this.drag = {
-      x: e.clientX,
-      y: e.clientY,
-      p: this.progress,
-      moved: false,
-      v: 0,
-      t: performance.now(),
-      unit: Math.min(window.innerWidth, window.innerHeight) * 0.5,
-    };
+    // On the front card, at rest, a drag — mouse, pen or touch — spins it;
+    // anywhere else, a side card or empty space, it scrolls the track.
+    const index = this.hit(e);
+    this.drag =
+      index !== -1 && index === this.active && this.cards[index] && this.settled()
+        ? { mode: 'spin', index, x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, moved: false }
+        : {
+            mode: 'track',
+            x: e.clientX,
+            y: e.clientY,
+            p: this.progress,
+            moved: false,
+            v: 0,
+            t: performance.now(),
+            unit: Math.min(window.innerWidth, window.innerHeight) * 0.5,
+          };
     try {
       this.stage.setPointerCapture(e.pointerId);
     } catch {
@@ -848,58 +962,116 @@ export class FoilCardScene {
       else if (index !== -1) this.goTo(index);
       return;
     }
+    if (drag.mode === 'spin') {
+      this.springBack(drag.index);
+      return;
+    }
     this.target = Math.round(this.progress + clamp(drag.v * DRAG_THROW, -DRAG_THROW_MAX, DRAG_THROW_MAX));
   };
 
   private onPointerCancel = () => {
+    const drag = this.drag;
+    if (!drag) return;
     this.drag = null;
-    this.target = Math.round(this.progress);
+    if (drag.mode === 'spin') this.springBack(drag.index);
+    else this.target = Math.round(this.progress);
   };
 
+  private springBack(index: number) {
+    const card = this.cards[index];
+    if (card) card.spinBack = { from: card.spin.clone(), start: performance.now() };
+  }
+
+  private lockWheel(size: number) {
+    const { wheel } = this;
+    wheel.locked = true;
+    wheel.acc = 0;
+    wheel.peak = size;
+    wheel.min = Infinity;
+  }
+
+  // Each mouse notch is one push; a trackpad gesture is one push until a
+  // fresh push rises out of its momentum.
   private onWheel = (e: WheelEvent) => {
     e.preventDefault();
+    const { wheel } = this;
     const now = performance.now();
-    // A fresh gesture is measured from the card the track was heading for.
-    if (now - this.lastWheel > WHEEL_GESTURE_MS) this.wheelAnchor = Math.round(this.target);
-    const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-    const px = e.deltaMode === 1 ? delta * WHEEL_LINE : e.deltaMode === 2 ? delta * WHEEL_PAGE : delta;
-    this.target += clamp(px, -WHEEL_MAX, WHEEL_MAX) * WHEEL_GAIN;
-    this.lastWheel = now;
+    const raw = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    const delta = e.deltaMode === 1 ? raw * WHEEL_LINE : e.deltaMode === 2 ? raw * WHEEL_PAGE : raw;
+    const size = Math.abs(delta);
+    if (!delta) return;
+    const gap = now - wheel.last;
+    wheel.last = now;
+    const notch =
+      e.deltaMode !== 0 || (size >= NOTCH_MIN && (gap > NOTCH_GAP_MS || size === wheel.prevAbs));
+    if (notch) {
+      wheel.prevAbs = size;
+      this.lockWheel(size);
+      this.stepBy(delta > 0 ? 1 : -1);
+      return;
+    }
+    if (gap > QUIET_MS) {
+      wheel.acc = 0;
+      wheel.locked = false;
+    } else if (wheel.locked) {
+      // The momentum is still rising to its peak, or dying away from it.
+      if (wheel.min === Infinity && size >= wheel.prevAbs) wheel.peak = Math.max(wheel.peak, size);
+      else wheel.min = Math.min(wheel.min, size);
+      if (
+        this.canStep() &&
+        wheel.min <= wheel.peak * 0.5 &&
+        size >= REARM_MIN &&
+        size >= wheel.min * REARM_RATIO &&
+        size > wheel.prevAbs
+      ) {
+        wheel.acc = 0;
+        wheel.locked = false;
+      }
+    }
+    wheel.prevAbs = size;
+    if (wheel.locked) return;
+    if (Math.sign(delta) !== Math.sign(wheel.acc)) wheel.acc = 0;
+    wheel.acc += delta;
+    if (Math.abs(wheel.acc) >= WHEEL_THRESHOLD) {
+      const direction = wheel.acc > 0 ? 1 : -1;
+      this.lockWheel(size);
+      this.stepBy(direction);
+    }
   };
 
   /** Which card is under the pointer, or -1. */
   private hit(e: PointerEvent) {
     const r = this.stage.getBoundingClientRect();
-    const point = new this.three.Vector2(
-      ((e.clientX - r.left) / r.width) * 2 - 1,
-      -((e.clientY - r.top) / r.height) * 2 + 1,
-    );
-    const ray = new this.three.Raycaster();
-    ray.setFromCamera(point, this.camera);
+    const first = this.pick(e.clientX - r.left, e.clientY - r.top, r.width, r.height);
+    return first ? (first.object.userData.index as number) : -1;
+  }
+
+  /** What a point of the stage, in px, lands on: the nearest card's board. */
+  private pick(x: number, y: number, width: number, height: number) {
+    this.hoverNdc.set((x / width) * 2 - 1, -(y / height) * 2 + 1);
+    this.hoverRay.setFromCamera(this.hoverNdc, this.camera);
     const meshes: THREE_NS.Mesh[] = [];
     this.cards.forEach((card) => {
       if (card?.outer.visible) meshes.push(...card.meshes);
     });
-    const first = ray.intersectObjects(meshes, false)[0];
-    return first ? (first.object.userData.index as number) : -1;
+    return this.hoverRay.intersectObjects(meshes, false)[0];
   }
 
   private frame = (now: number) => {
     if (this.disposed) return;
-    const { camera, smooth, pointer, cards } = this;
+    const { camera, pointer, cards } = this;
     const count = cards.length;
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
 
-    // Once the wheel has gone quiet: a small flick moves exactly one card.
-    if (!this.drag && this.lastWheel > 0 && now - this.lastWheel > WHEEL_SNAP_MS) {
-      const moved = this.target - this.wheelAnchor;
-      this.target =
-        this.wheelAnchor +
-        (Math.abs(moved) < WHEEL_COMMIT ? 0 : Math.sign(moved) * Math.max(1, Math.round(Math.abs(moved))));
-      this.lastWheel = 0;
-    }
-    if (!this.drag) {
+    const anim = this.anim;
+    if (anim) {
+      // A step or a jump: a fixed time, fast away and slow to settle.
+      const k = clamp((now - anim.start) / anim.dur, 0, 1);
+      this.progress = k === 1 ? anim.to : anim.from + (anim.to - anim.from) * easeOut(k);
+      if (k === 1) this.anim = null;
+    } else if (!this.drag) {
+      // Let go of: the track settles on the card it was thrown at.
       const rate = this.reduced ? TRACK_RATE_REDUCED : TRACK_RATE;
       this.progress += (this.target - this.progress) * (1 - Math.exp(-dt * rate));
     }
@@ -907,6 +1079,7 @@ export class FoilCardScene {
     // Heading for another card: the open one closes.
     if (
       this.openTarget &&
+      !this.anim &&
       !this.drag &&
       !this.settled() &&
       Math.abs(this.target - this.progress) > CLOSE_BEYOND
@@ -914,24 +1087,6 @@ export class FoilCardScene {
       this.openTarget = 0;
       this.emit();
     }
-
-    // Where the light and the lean are heading: the pointer, or a slow drift
-    // of its own once the pointer has been still a while.
-    let tx = pointer.x;
-    let ty = pointer.y;
-    if (!this.drag && now - this.lastMove > IDLE_MS) {
-      const t = now / 1000;
-      if (this.reduced) {
-        tx = 0.25;
-        ty = -0.1;
-      } else {
-        tx = Math.sin(t * 0.42) * 0.6;
-        ty = Math.sin(t * 0.29 + 1) * 0.35;
-      }
-    }
-    const k = 1 - Math.exp(-dt * 3.5);
-    smooth.x += (tx - smooth.x) * k;
-    smooth.y += (ty - smooth.y) * k;
 
     const front = cards[this.active];
     const frontOpen = front ? ease(front.openP) : 0;
@@ -942,7 +1097,18 @@ export class FoilCardScene {
     this.camDist += (want - this.camDist) * (1 - Math.exp(-dt * 5));
     camera.position.set(0, 0, this.camDist);
     camera.lookAt(0, 0, 0);
-    this.glint.position.set(smooth.x * 2.2, -smooth.y * 1.6 + 0.4, 2.2);
+
+    // Which card is under the mouse. No hover on touch, or while dragging.
+    const hoverHit =
+      pointer.over && pointer.mouse && !this.drag?.moved
+        ? this.pick(pointer.x, pointer.y, this.stageWidth, this.stageHeight)
+        : undefined;
+    const hovered = hoverHit ? (hoverHit.object.userData.index as number) : -1;
+    const hoverK = 1 - Math.exp(-dt * HOVER_RATE);
+    // The glint rests in place, and follows the mouse only over a card.
+    if (hoverHit) this.glintGoal.copy(hoverHit.point).setZ(hoverHit.point.z + GLINT_LIFT);
+    else this.glintGoal.set(...GLINT_REST);
+    this.glint.position.lerp(this.glintGoal, hoverK);
 
     const spread = 1 + SPREAD_OPEN * frontOpen;
     const tan = Math.tan((camera.fov * Math.PI) / 360);
@@ -994,14 +1160,38 @@ export class FoilCardScene {
 
       // Leaning back with the rest; turned to the reader as it opens at the front.
       this.turn.copy(this.lean).slerp(this.facing, Math.max(0, 1 - Math.abs(t) * 2) * open);
-      const near = Math.max(0, 1 - Math.abs(t));
-      this.tipAngles.set(
-        smooth.y * POINTER_TILT[0] * (1 + near),
-        smooth.x * POINTER_TILT[1] * (1 + near),
-        0,
-      );
+      // Hover: the side under the mouse dips away, so the card turns to face
+      // the cursor, and eases back when the mouse leaves.
+      let gx = 0;
+      let gy = 0;
+      if (i === hovered && !this.reduced) {
+        // The card's centre and half its size on screen, in px of the stage.
+        const size = card.outer.scale.x;
+        const { proj, projEdge } = this;
+        proj.copy(card.outer.position).project(camera);
+        projEdge.copy(card.outer.position);
+        projEdge.x += (CW / 2) * size;
+        projEdge.y += (CH / 2) * size;
+        projEdge.project(camera);
+        const halfW = ((projEdge.x - proj.x) / 2) * this.stageWidth;
+        const halfH = ((projEdge.y - proj.y) / 2) * this.stageHeight;
+        gx = clamp((pointer.x - ((proj.x + 1) / 2) * this.stageWidth) / halfW, -1, 1);
+        gy = clamp((pointer.y - ((1 - proj.y) / 2) * this.stageHeight) / halfH, -1, 1);
+      }
+      card.hx += (gx - card.hx) * hoverK;
+      card.hy += (gy - card.hy) * hoverK;
+      this.tipAngles.set(card.hy * HOVER_TILT, card.hx * HOVER_TILT, 0);
       this.tip.setFromEuler(this.tipAngles);
-      card.outer.quaternion.copy(this.tip).multiply(this.turn);
+      // Spun by a drag on the front card; let go, it eases back to rest.
+      if (card.spinBack) {
+        const k = Math.min(1, (now - card.spinBack.start) / (this.reduced ? SPIN_BACK_MS_REDUCED : SPIN_BACK_MS));
+        card.spin.copy(card.spinBack.from).slerp(this.rest, easeOut(k));
+        if (k >= 1) {
+          card.spin.identity();
+          card.spinBack = null;
+        }
+      }
+      card.outer.quaternion.copy(card.spin).multiply(this.tip).multiply(this.turn);
 
       const bump = (BUMP_DEPTH * density) / Math.max(0.1, this.camDist - card.outer.position.z);
       card.reliefs.forEach((material) => {

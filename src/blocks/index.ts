@@ -1,4 +1,4 @@
-import type { Block } from "payload";
+import type { Block, FieldAccess } from "payload";
 import { lexicalEditor } from "@payloadcms/richtext-lexical";
 
 export const RichTextBlock: Block = {
@@ -93,7 +93,44 @@ export const CallToActionBlock: Block = {
   ],
 };
 
+// Who may write a Code Embed's code. It runs on the published page (inside a
+// sandboxed iframe), so this is the one switch for who is trusted with that.
+// false: anyone who can log into the admin. true: admins only — an editor
+// still sees the block, but any code they enter is dropped on save.
+const CODE_EMBED_ADMIN_ONLY = false;
+
+const codeEmbedAccess: FieldAccess = ({ req: { user } }) =>
+  CODE_EMBED_ADMIN_ONLY ? user?.role === "admin" : Boolean(user);
+
+const codeEmbedCode = { create: codeEmbedAccess, update: codeEmbedAccess };
+
+export const CodeEmbedBlock: Block = {
+  slug: "codeEmbed",
+  interfaceName: "CodeEmbedBlock",
+  labels: { singular: "Code Embed", plural: "Code Embeds" },
+  fields: [
+    {
+      name: "title",
+      type: "text",
+      required: true,
+      admin: { description: "Names the widget for screen readers and is shown under it." },
+    },
+    { name: "html", type: "code", admin: { language: "html" }, access: codeEmbedCode },
+    { name: "css", type: "code", admin: { language: "css" }, access: codeEmbedCode },
+    { name: "js", type: "code", admin: { language: "javascript" }, access: codeEmbedCode },
+    {
+      name: "height",
+      type: "number",
+      defaultValue: 400,
+      min: 1,
+      admin: { description: "Height of the widget's frame, in pixels." },
+    },
+    { name: "caption", type: "text" },
+  ],
+};
+
 export const contentBlocks: Block[] = [
+  CodeEmbedBlock,
   RichTextBlock,
   ImageGridBlock,
   QuoteBlock,

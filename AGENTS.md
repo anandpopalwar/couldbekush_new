@@ -334,6 +334,17 @@ carries its own scroller rather than fighting that rule.
   wrapper a stacking context, and a blend nested inside it would be isolated
   from the shots and render solid white.
 
+### Content blocks
+A project's `content` blocks are drawn after the shots by
+`components/blocks/RenderBlocks.tsx`, a switch on `blockType`. Only
+`codeEmbed` has a component; the other block types are skipped.
+
+A Code Embed runs an editor's HTML, CSS and JS in an iframe, built by
+`lib/codeEmbedDoc.ts` and passed as `srcDoc`. **The sandbox is `allow-scripts`
+alone — never add `allow-same-origin` beside it**, and never render those
+fields into the page itself. Who may write the code is
+`CODE_EMBED_ADMIN_ONLY` in `src/blocks/index.ts`.
+
 ### The two fades
 `HeavyScroll` publishes two custom properties on the scroller and everything
 inside inherits them — no element needs its own listener.
@@ -469,15 +480,12 @@ those two return home.
   card opens it, on any other brings it forward; the open card closes as soon
   as the track heads elsewhere. The wheel listener is on `window` and calls
   `preventDefault` — right here, where nothing scrolls, and nowhere else.
-- **The track goes round, and joins out of sight.** A card that runs off one
-  end comes back on at the other. `setWindow()` (called from `layout()`) walks
-  out from the front card both ways until a card would be off the screen and
-  centres the wrap window on that stretch, so cards leave *through the
-  screen's edges* at full size and the jump is never seen. A fixed window
-  centred on the front card — what the source design had — ended the track
-  well inside a wide screen, the last card shrinking away in the lower left.
-  Only when the screen shows more of the track than five cards can fill (a
-  very wide window) does the far end fall short and shrink.
+- **The track has two ends.** It starts on the first magazine, with nothing
+  before it, and stops on the last: a step, a jump, a drag and a throw are
+  all held to `[0, count - 1]` by `bound()`. It does not go round — it did
+  once, and was changed on request. `setWindow()` (called from `layout()`)
+  walks out from the front card both ways until a card would be off the
+  screen; a card is full size up to there and hidden just beyond.
 - **Nothing is an image.** Each design is drawn in code as white masks — foil,
   ink, blind deboss — in units of `u`, 1% of the card's width, so one drawing
   serves any size. The scene bakes the cover and the greeting page into two
@@ -639,7 +647,7 @@ strings against source files.
 | Right rail | `rail-right`, `rail-right-viewport`, `rail-right-track`, `rail-right-slot`, `rail-right-swatches`, `rail-right-showreel` |
 | Deck | `deck-scroller`, `deck-stage`, `deck-frame`, `deck-card`, `deck-hint` |
 | Below 1100 | `menu-toggle`, `mobile-brand`, `mobile-info`, `mobile-counter`, `mobile-detail`, `mobile-swatches`, `mobile-menu`, `mobile-menu-nav`, `mobile-menu-footer` |
-| Case study | `case-study`, `case-study-body`, `case-study-rail`, `case-study-shots`, `case-study-shot`, `case-study-minimap`, `case-study-title`, `case-study-next` |
+| Case study | `case-study`, `case-study-body`, `case-study-rail`, `case-study-shots`, `case-study-shot`, `case-study-embed`, `case-study-minimap`, `case-study-title`, `case-study-next` |
 | About | `about-page`, `about-stage`, `about-ui`, `about-top`, `about-notes` |
 | Overlays | `grain-overlay`, `toast` |
 

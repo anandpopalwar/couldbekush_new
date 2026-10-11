@@ -6,6 +6,7 @@ import { getProject, getProjects } from '@/lib/getProjects';
 import { ProjectChrome } from '@/components/portfolio/ProjectChrome';
 import { PageEnter } from '@/components/portfolio/PageEnter';
 import { HeavyScroll } from '@/components/portfolio/HeavyScroll';
+import { RenderBlocks } from '@/components/blocks/RenderBlocks';
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -151,6 +152,8 @@ export default async function ProjectPage({ params }: Params) {
               />
             </figure>
           ))}
+          {/* The project's content blocks, after the shots. */}
+          <RenderBlocks blocks={project.content} />
         </PageEnter>
 
         {/* A rail of every shot, doubling as the page's progress. Pinned to the

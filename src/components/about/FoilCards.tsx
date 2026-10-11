@@ -160,7 +160,7 @@ export function FoilCards({ magazines }: { magazines: MagazineData[] }) {
       e.preventDefault();
       const direction = forward ? 1 : -1;
       if (scene) scene.stepBy(direction);
-      else show((indexRef.current + direction + cards.length) % cards.length, false);
+      else show(Math.min(cards.length - 1, Math.max(0, indexRef.current + direction)), false);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);

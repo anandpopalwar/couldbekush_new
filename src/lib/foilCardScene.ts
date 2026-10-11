@@ -61,20 +61,17 @@ const GLINT: Vec3 = [6, 8, 2];
 const STEP: { wide: Vec3; stacked: Vec3 } = { wide: [1.3, 0.42, 0.95], stacked: [1.02, 0.62, 0.8] };
 // An open front card pushes its neighbours this much further away.
 const SPREAD_OPEN = 0.85;
-// The track goes round: a card that runs off one end comes back on at the
-// other. Where it joins is worked out from the screen (see setWindow), so that
-// both ends are out of sight. These are how far a leaning card reaches either
+// The track has two ends: the first card and the last, and it stops at each.
+// Cards past the screen's edges are hidden (see setWindow). These are how far
+// a leaning card reaches either
 // side of its centre, in card widths — what decides it has left the screen —
 // and the step the walk out to each edge takes.
 const CARD_REACH: [number, number] = [0.56, 0.6];
 const WALK = 0.05;
 // Closer to the camera than this, a card isn't in front of it any more.
 const NEAR_LIMIT = 0.3;
-// A card grows in at the far end and out at the near one, by scale. Normally
-// that happens off screen and is never seen; these are the stretches it takes
-// when the screen shows more of the track than there are cards to fill.
-const FADE_IN_SPAN = 0.65;
-const FADE_OUT_SPAN = 0.3;
+// A card grows in at the far end and out at the near one, by scale, over
+// this stretch just past the screen's edge — off screen, never seen.
 const FADE_MIN = 0.05;
 const FADE_HIDE = 0.002;
 // Every card leans back about a diagonal axis; the open front card turns to
@@ -229,7 +226,6 @@ type Drag =
   | { mode: 'spin'; id: number; index: number; x: number; y: number; lx: number; ly: number; moved: boolean };
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
-const mod = (a: number, n: number) => ((a % n) + n) % n;
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 // The track's timed moves: a fast start and a long settle.
 const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
@@ -320,9 +316,8 @@ export class FoilCardScene {
   private stageWidth = 1;
   private stageHeight = 1;
 
-  // The window a card's place on the track wraps in, and the stretch at each
-  // end where it grows in or out. Set by layout().
-  private wrapFrom = -2.5;
+  // The stretch past each edge of the screen where a card grows in or out.
+  // Set by layout().
   private fadeIn: [number, number] = [-2.5, -1.85];
   private fadeOut: [number, number] = [2.2, 2.5];
 
@@ -447,16 +442,13 @@ export class FoilCardScene {
 
   /* ── what the page can ask for ─────────────────────────────────────── */
 
-  /** Bring a card to the front by the shortest way round the track. */
+  /** Bring a card to the front. */
   goTo(index: number) {
-    const count = this.cards.length;
-    const base = Math.round(this.target);
-    let delta = mod(index - mod(base, count), count);
-    if (delta > count / 2) delta -= count;
+    const delta = this.bound(index) - Math.round(this.target);
     if (!delta) return;
     this.close();
     this.moveTo(
-      base + delta,
+      index,
       this.reduced
         ? MOVE_MS_REDUCED
         : Math.min(JUMP_MS_MAX, STEP_MS + JUMP_MS_PER_CARD * (Math.abs(delta) - 1)),
@@ -466,8 +458,11 @@ export class FoilCardScene {
   /** One card along. Ignored while a move has only just begun, or in the hand. */
   stepBy(direction: 1 | -1) {
     if (!this.canStep() || this.drag?.moved) return;
+    // The track ends at the first card and at the last.
+    const to = this.bound(Math.round(this.target) + direction);
+    if (to === Math.round(this.target)) return;
     this.close();
-    this.moveTo(Math.round(this.target) + direction, this.reduced ? MOVE_MS_REDUCED : STEP_MS);
+    this.moveTo(to, this.reduced ? MOVE_MS_REDUCED : STEP_MS);
   }
 
   toggleOpen() {
@@ -521,7 +516,13 @@ export class FoilCardScene {
     this.emit();
   }
 
-  private moveTo(to: number, dur: number) {
+  /** A place on the track, held between its first card and its last. */
+  private bound(position: number) {
+    return clamp(position, 0, this.cards.length - 1);
+  }
+
+  private moveTo(place: number, dur: number) {
+    const to = this.bound(place);
     this.anim = { from: this.progress, to, start: performance.now(), dur };
     this.target = to;
   }
@@ -605,20 +606,14 @@ export class FoilCardScene {
     camera.setViewOffset(width, height, 0, height / 2 - centre, width, height);
     camera.updateProjectionMatrix();
     this.step.set(...(stacked ? STEP.stacked : STEP.wide));
-    // The carousel hides a card long before it would wrap, so it wraps
-    // evenly; the tracks join wherever the screen can't see.
-    if (phone) this.wrapFrom = -this.cards.length / 2;
-    else this.setWindow(width, height, centre);
+    // The carousel hides its own cards by distance.
+    if (!phone) this.setWindow(width, height, centre);
   };
 
   /**
-   * Where the track joins up. This walks out from the front card in both
-   * directions until a card would be off the screen, and centres the wrap
-   * window on that stretch — so cards leave through the screen's edges and
-   * the jump from one end to the other is never seen. If the screen shows
-   * more of the track than there are cards to fill (a very wide window), the
-   * near end is kept clean and the far end falls short of the edge, the last
-   * card shrinking away as it goes.
+   * Where the screen stops seeing the track. This walks out from the front
+   * card in both directions until a card would be off the screen; a card is
+   * full size up to there and hidden just beyond.
    */
   private setWindow(width: number, height: number, centre: number) {
     const count = this.cards.length;
@@ -643,12 +638,8 @@ export class FoilCardScene {
     let near = WALK;
     while (near < count && seen(near)) near += WALK;
 
-    const fits = near - far <= count;
-    const from = fits ? (far + near - count) / 2 : near - count;
-    const to = from + count;
-    this.wrapFrom = from;
-    this.fadeIn = [from, from + (fits ? Math.max(FADE_MIN, far - from) : FADE_IN_SPAN)];
-    this.fadeOut = [to - Math.max(FADE_MIN, Math.min(FADE_OUT_SPAN, to - near)), to];
+    this.fadeIn = [far - FADE_MIN, far];
+    this.fadeOut = [near, near + FADE_MIN];
   }
 
   /* ── pressing a card ───────────────────────────────────────────────── */
@@ -855,17 +846,17 @@ export class FoilCardScene {
     if (this.disposed) return;
 
     const count = this.cards.length;
-    const front = mod(Math.round(this.progress), count);
+    const front = this.bound(Math.round(this.progress));
     if (!(await this.press(front))) return;
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.frame);
     this.options.onReady();
 
     // Nearest to the front first, either side.
-    for (let away = 1; away <= count / 2; away++) {
+    for (let away = 1; away < count; away++) {
       for (const side of [1, -1]) {
-        const index = mod(front + side * away, count);
-        if (this.cards[index]) continue;
+        const index = front + side * away;
+        if (index < 0 || index >= count || this.cards[index]) continue;
         if (!(await this.press(index))) return;
       }
     }
@@ -917,7 +908,7 @@ export class FoilCardScene {
     // Along the track: up and to the right brings the next card forward.
     // The carousel runs straight across; the tracks run on their diagonal.
     const along = this.mode === 'phone' ? dx : dx * DRAG_AXIS[0] + dy * DRAG_AXIS[1];
-    const position = drag.p - along / drag.unit;
+    const position = this.bound(drag.p - along / drag.unit);
     drag.v = (position - this.progress) / Math.max(0.008, (now - drag.t) / 1000);
     drag.t = now;
     this.progress = this.target = position;
@@ -971,7 +962,9 @@ export class FoilCardScene {
       this.springBack(drag.index);
       return;
     }
-    this.target = Math.round(this.progress + clamp(drag.v * DRAG_THROW, -DRAG_THROW_MAX, DRAG_THROW_MAX));
+    this.target = this.bound(
+      Math.round(this.progress + clamp(drag.v * DRAG_THROW, -DRAG_THROW_MAX, DRAG_THROW_MAX)),
+    );
   };
 
   private onPointerCancel = () => {
@@ -1080,7 +1073,7 @@ export class FoilCardScene {
       const rate = this.reduced ? TRACK_RATE_REDUCED : TRACK_RATE;
       this.progress += (this.target - this.progress) * (1 - Math.exp(-dt * rate));
     }
-    this.setActive(mod(Math.round(this.progress), count));
+    this.setActive(this.bound(Math.round(this.progress)));
     // Heading for another card: the open one closes.
     if (
       this.openTarget &&
@@ -1126,8 +1119,8 @@ export class FoilCardScene {
     for (let i = 0; i < count; i++) {
       const card = cards[i];
       if (!card) continue;
-      // Signed distance from the front, wrapped so the track goes round.
-      const t = mod(i - this.progress - this.wrapFrom, count) + this.wrapFrom;
+      // Signed distance from the front.
+      const t = i - this.progress;
 
       const opening = i === this.active && this.openTarget ? 1 : -1;
       card.openP = clamp(card.openP + (opening * dt) / (this.reduced ? 0.15 : OPEN_TIME), 0, 1);

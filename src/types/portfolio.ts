@@ -1,3 +1,5 @@
+import type { Project as PayloadProject } from '@/payload-types';
+
 export interface Project {
   id: string;
   /** URL segment for /project/[slug]. */
@@ -16,6 +18,8 @@ export interface Project {
   overview?: string;
   gallery?: string[];
   themeColors?: string[];
+  /** The CMS's content blocks, as stored — see RenderBlocks. */
+  content?: PayloadProject['content'];
 }
 
 export type NavSection = 'work' | 'about' | 'playground' | 'contact';

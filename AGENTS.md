@@ -334,6 +334,17 @@ carries its own scroller rather than fighting that rule.
   wrapper a stacking context, and a blend nested inside it would be isolated
   from the shots and render solid white.
 
+### Content blocks
+A project's `content` blocks are drawn after the shots by
+`components/blocks/RenderBlocks.tsx`, a switch on `blockType`. Only
+`codeEmbed` has a component; the other block types are skipped.
+
+A Code Embed runs an editor's HTML, CSS and JS in an iframe, built by
+`lib/codeEmbedDoc.ts` and passed as `srcDoc`. **The sandbox is `allow-scripts`
+alone — never add `allow-same-origin` beside it**, and never render those
+fields into the page itself. Who may write the code is
+`CODE_EMBED_ADMIN_ONLY` in `src/blocks/index.ts`.
+
 ### The two fades
 `HeavyScroll` publishes two custom properties on the scroller and everything
 inside inherits them — no element needs its own listener.
@@ -636,7 +647,7 @@ strings against source files.
 | Right rail | `rail-right`, `rail-right-viewport`, `rail-right-track`, `rail-right-slot`, `rail-right-swatches`, `rail-right-showreel` |
 | Deck | `deck-scroller`, `deck-stage`, `deck-frame`, `deck-card`, `deck-hint` |
 | Below 1100 | `menu-toggle`, `mobile-brand`, `mobile-info`, `mobile-counter`, `mobile-detail`, `mobile-swatches`, `mobile-menu`, `mobile-menu-nav`, `mobile-menu-footer` |
-| Case study | `case-study`, `case-study-body`, `case-study-rail`, `case-study-shots`, `case-study-shot`, `case-study-minimap`, `case-study-title`, `case-study-next` |
+| Case study | `case-study`, `case-study-body`, `case-study-rail`, `case-study-shots`, `case-study-shot`, `case-study-embed`, `case-study-minimap`, `case-study-title`, `case-study-next` |
 | About | `about-page`, `about-stage`, `about-ui`, `about-top`, `about-notes` |
 | Overlays | `grain-overlay`, `toast` |
 

@@ -62,3 +62,64 @@ to set.
 If the files ever move to another host (S3, a CDN), that host must send
 `Access-Control-Allow-Origin: <the site's origin>` (or `*`) for `GET`, or every
 magazine will fail to load and the page will fall back to the built-in ones.
+
+## Code Embed (a block for projects and posts)
+
+A Code Embed is a small interactive widget — a counter, a calculator, a
+little animation — that you write yourself. You paste its HTML, CSS and
+JavaScript into three boxes in the admin, and it runs on the published project
+page, after the images, in a frame of its own.
+
+Use it when a picture can't show the thing and it needs to be played with.
+For plain text or images, use a normal block.
+
+**What the code can't do.** It runs shut off from the rest of the site:
+
+- It can't fetch anything or call an API. Images and fonts can be loaded from
+  `https://` addresses; nothing else can.
+- It can't save anything — no `localStorage`, no cookies. A score is gone when
+  the page is reloaded.
+- It can't read or change the page around it, or send the visitor elsewhere.
+
+**Before you publish**
+
+- A loop that never ends will freeze the visitor's browser tab. Try the
+  widget first.
+- Search engines don't read what is inside the frame. Anything that should be
+  found by search belongs in a normal block.
+- It only shows on a project's page. Posts have no page yet.
+
+**Try it.** Add a Code Embed, give it a title, and paste these in:
+
+HTML
+
+```html
+<button id="add">Clicked 0 times</button>
+```
+
+CSS
+
+```css
+button { font: inherit; padding: 12px 20px; cursor: pointer; }
+```
+
+JS
+
+```js
+let count = 0;
+const button = document.getElementById('add');
+button.addEventListener('click', () => {
+  count += 1;
+  button.textContent = `Clicked ${count} times`;
+});
+```
+
+Publish, open the project, and the button should count your clicks.
+
+Two samples — a light you move over a model, and a grid of dots — can be
+added to the temporary WON J. YOU STUDIOS project with
+`npx payload run scripts/seed-code-embed.ts`. Safe to re-run; delete the
+blocks from the project in the admin to remove them.
+
+Who may write the code is one switch, `CODE_EMBED_ADMIN_ONLY`, at the top of
+the block in `src/blocks/index.ts`.

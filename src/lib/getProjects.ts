@@ -32,6 +32,7 @@ const toPortfolioProject = (p: PayloadProject, index: number): Project => {
     overview: p.overview ?? undefined,
     gallery: p.gallery?.map((g) => mediaUrl(g.image, "hero")).filter(Boolean),
     themeColors: p.themeColors ?? undefined,
+    content: p.content,
   };
 };
 

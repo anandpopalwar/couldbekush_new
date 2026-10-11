@@ -285,7 +285,9 @@ export interface Project {
   /**
    * Optional rich case-study body.
    */
-  content?: (RichTextBlock | ImageGridBlock | QuoteBlock | CodeBlock | VideoEmbedBlock | CallToActionBlock)[] | null;
+  content?:
+    | (CodeEmbedBlock | RichTextBlock | ImageGridBlock | QuoteBlock | CodeBlock | VideoEmbedBlock | CallToActionBlock)[]
+    | null;
   publishedAt?: string | null;
   meta?: {
     title?: string | null;
@@ -298,6 +300,27 @@ export interface Project {
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "CodeEmbedBlock".
+ */
+export interface CodeEmbedBlock {
+  /**
+   * Names the widget for screen readers and is shown under it.
+   */
+  title: string;
+  html?: string | null;
+  css?: string | null;
+  js?: string | null;
+  /**
+   * Height of the widget's frame, in pixels.
+   */
+  height?: number | null;
+  caption?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'codeEmbed';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -410,7 +433,9 @@ export interface Post {
   author?: (string | null) | User;
   categories?: (string | Category)[] | null;
   publishedAt?: string | null;
-  content?: (RichTextBlock | ImageGridBlock | QuoteBlock | CodeBlock | VideoEmbedBlock | CallToActionBlock)[] | null;
+  content?:
+    | (CodeEmbedBlock | RichTextBlock | ImageGridBlock | QuoteBlock | CodeBlock | VideoEmbedBlock | CallToActionBlock)[]
+    | null;
   meta?: {
     title?: string | null;
     description?: string | null;
@@ -868,6 +893,7 @@ export interface ProjectsSelect<T extends boolean = true> {
   content?:
     | T
     | {
+        codeEmbed?: T | CodeEmbedBlockSelect<T>;
         richText?: T | RichTextBlockSelect<T>;
         imageGrid?: T | ImageGridBlockSelect<T>;
         quote?: T | QuoteBlockSelect<T>;
@@ -886,6 +912,20 @@ export interface ProjectsSelect<T extends boolean = true> {
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "CodeEmbedBlock_select".
+ */
+export interface CodeEmbedBlockSelect<T extends boolean = true> {
+  title?: T;
+  html?: T;
+  css?: T;
+  js?: T;
+  height?: T;
+  caption?: T;
+  id?: T;
+  blockName?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -973,6 +1013,7 @@ export interface PostsSelect<T extends boolean = true> {
   content?:
     | T
     | {
+        codeEmbed?: T | CodeEmbedBlockSelect<T>;
         richText?: T | RichTextBlockSelect<T>;
         imageGrid?: T | ImageGridBlockSelect<T>;
         quote?: T | QuoteBlockSelect<T>;

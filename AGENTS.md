@@ -469,15 +469,12 @@ those two return home.
   card opens it, on any other brings it forward; the open card closes as soon
   as the track heads elsewhere. The wheel listener is on `window` and calls
   `preventDefault` — right here, where nothing scrolls, and nowhere else.
-- **The track goes round, and joins out of sight.** A card that runs off one
-  end comes back on at the other. `setWindow()` (called from `layout()`) walks
-  out from the front card both ways until a card would be off the screen and
-  centres the wrap window on that stretch, so cards leave *through the
-  screen's edges* at full size and the jump is never seen. A fixed window
-  centred on the front card — what the source design had — ended the track
-  well inside a wide screen, the last card shrinking away in the lower left.
-  Only when the screen shows more of the track than five cards can fill (a
-  very wide window) does the far end fall short and shrink.
+- **The track has two ends.** It starts on the first magazine, with nothing
+  before it, and stops on the last: a step, a jump, a drag and a throw are
+  all held to `[0, count - 1]` by `bound()`. It does not go round — it did
+  once, and was changed on request. `setWindow()` (called from `layout()`)
+  walks out from the front card both ways until a card would be off the
+  screen; a card is full size up to there and hidden just beyond.
 - **Nothing is an image.** Each design is drawn in code as white masks — foil,
   ink, blind deboss — in units of `u`, 1% of the card's width, so one drawing
   serves any size. The scene bakes the cover and the greeting page into two

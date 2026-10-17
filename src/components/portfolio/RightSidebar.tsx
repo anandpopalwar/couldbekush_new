@@ -88,22 +88,18 @@ function slotColor(emphasis: number) {
   return `rgb(${channel(0)}, ${channel(1)}, ${channel(2)})`;
 }
 
+// The block sits against the rail's right edge (its pr-6 matches the left
+// nav's gap to the screen), its lines still centred within it.
 const SLOT_CONTENT_CLASS =
-  "w-full h-full flex flex-col items-center justify-center text-center cursor-pointer";
+  "w-full h-full flex flex-col items-end justify-center text-center cursor-pointer";
 
 function SlotContent({ project }: { project: Project }) {
   return (
-    <>
-      <span className="rs-sub font-code uppercase mb-1">
-        {project.subtitle}
-      </span>
-
+    <div className="max-w-[280px] flex flex-col items-center">
       <h4 className="rs-title uppercase">{project.title}</h4>
 
-      <p className="rs-desc max-w-[280px] line-clamp-3">
-        {project.description}
-      </p>
-    </>
+      <p className="rs-desc line-clamp-3">{project.description}</p>
+    </div>
   );
 }
 

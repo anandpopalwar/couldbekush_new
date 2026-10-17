@@ -680,7 +680,9 @@ Below `compact` the whole layout changes: both sidebars are hidden and
 beneath it, then the swatches, then the page number (the numeral alone, no
 total), centred at the foot.
 
-There is no header at any width. The contact line, "Working globally", the
+There is no header at any width — only the logo (`mobile-brand`, despite
+the name): centred at the top below `compact`, above the left nav from
+`compact` up, where the nav is pushed down by its height. On every route. The contact line, "Working globally", the
 audio toggle and the scroll hint were removed, and `TopHeader` with them. The
 address now appears only in the Contact panel and in the mobile menu's
 footer.

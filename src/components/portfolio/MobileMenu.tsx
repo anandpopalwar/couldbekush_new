@@ -155,7 +155,7 @@ export function MobileMenu({
           panel — one element that morphs between the two states rather than a
           separate button appearing here. Only the brand belongs to the panel. */}
       <div className="absolute top-5 left-0 right-0 flex justify-center">
-        <span className="text-title-h6 tracking-tight leading-none">couldbekush</span>
+        <span role="img" aria-label="couldbekush" className="block h-5 aspect-[4890/1160] bg-ink [mask:url(/logo.svg)_center/contain_no-repeat]" />
       </div>
 
       <p ref={taglineRef} className="absolute left-4 top-[30%] text-label-xs">

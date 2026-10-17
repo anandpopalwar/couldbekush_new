@@ -30,9 +30,6 @@ export function LeftSidebar({
       {/* Primary Section Nav Links — indented to the main column (aligns with Launch),
           raised to sit at the top header row like the reference. */}
       <div className="rail-left-nav p-6 pointer-events-auto">
-        <span className="block text-micro-md font-mono tracking-widest text-inkMuted uppercase mb-4">
-          Menu
-        </span>
         {/* 24/32, no tracking, weight 500 — exactly the title-h5 token. */}
         <nav className="group space-y-0 uppercase text-title-h5">
           {navItems.map((item) => {

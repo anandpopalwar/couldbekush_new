@@ -69,10 +69,8 @@ export function MobileChrome({
       />
 
       {/* Brand, centred on the viewport independently of the button. */}
-      <div className="mobile-brand compact:hidden fixed top-5 left-0 right-0 z-40 flex justify-center pointer-events-none">
-        <span className="text-title-h6 text-ink tracking-tight leading-none">
-          couldbekush
-        </span>
+      <div className="mobile-brand fixed top-5 compact:top-6 left-0 right-0 z-40 flex justify-center pointer-events-none mix-blend-difference">
+        <span role="img" aria-label="couldbekush" className="block h-5 compact:h-[calc(theme(spacing.5)*1.5)] aspect-[4890/1160] bg-invert [mask:url(/logo.svg)_center/contain_no-repeat]" />
       </div>
 
       {/* The project's details and its number. Upright, these are three blocks

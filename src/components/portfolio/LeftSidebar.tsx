@@ -31,7 +31,7 @@ export function LeftSidebar({
           raised to sit at the top header row like the reference. */}
       <div className="rail-left-nav p-6 pointer-events-auto">
         {/* 24/32, no tracking, weight 500 — exactly the title-h5 token. */}
-        <nav className="group space-y-0 uppercase text-title-h5">
+        <nav className="mt-[calc(theme(spacing.5)*1.5_+_theme(spacing.4))] group space-y-0 uppercase text-title-h5">
           {navItems.map((item) => {
             const isActive = activeSection === item.id;
             return (

@@ -63,7 +63,7 @@ export function ProjectChrome({ active = 'work' }: { active?: NavSection }) {
   return (
     <>
       <div className="chrome-nav hidden compact:block fixed top-6 left-6 z-30 pointer-events-auto">
-        <nav className="group flex flex-col items-start uppercase text-title-h5">
+        <nav className="mt-[calc(theme(spacing.5)*1.5_+_theme(spacing.4))] group flex flex-col items-start uppercase text-title-h5">
           {NAV_ITEMS.map((item) => (
             <SlideLink
               key={item.id}
@@ -88,8 +88,8 @@ export function ProjectChrome({ active = 'work' }: { active?: NavSection }) {
         onToggle={menuOpen ? () => setClosing(true) : () => setMenuOpen(true)}
       />
 
-      <div className="mobile-brand fixed top-5 compact:top-6 left-0 right-0 z-40 flex justify-center pointer-events-none mix-blend-difference">
-        <span role="img" aria-label="couldbekush" className="block h-5 compact:h-[calc(theme(spacing.5)*1.5)] aspect-[4890/1160] bg-invert [mask:url(/logo.svg)_center/contain_no-repeat]" />
+      <div className="mobile-brand fixed top-5 compact:top-6 left-0 right-0 compact:left-6 compact:right-auto z-40 flex justify-center pointer-events-none mix-blend-difference">
+        <span role="img" aria-label="couldbekush" className="block h-5 md:h-[calc(theme(spacing.5)*1.5)] aspect-[4890/1160] bg-invert [mask:url(/logo.svg)_center/contain_no-repeat]" />
       </div>
 
       {menuOpen && (

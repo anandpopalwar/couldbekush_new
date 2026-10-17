@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { ChromeLogo } from '@/components/ui/ChromeLogo';
 import { usePathname } from 'next/navigation';
 import { SlideLink } from '@/components/transition/SlideLink';
 import { MenuToggle } from '@/components/portfolio/MenuToggle';
@@ -63,11 +64,7 @@ export function ProjectChrome({ active = 'work' }: { active?: NavSection }) {
   return (
     <>
       <div className="chrome-nav hidden compact:block fixed top-6 left-6 z-30 pointer-events-auto">
-        <span className="block text-micro-md font-mono tracking-widest text-inkMuted uppercase mb-4">
-          Menu
-        </span>
-
-        <nav className="group flex flex-col items-start uppercase text-title-h5">
+        <nav className="mt-[calc(theme(spacing.5)*1.5_+_theme(spacing.4))] group flex flex-col items-start uppercase text-title-h5">
           {NAV_ITEMS.map((item) => (
             <SlideLink
               key={item.id}
@@ -92,10 +89,8 @@ export function ProjectChrome({ active = 'work' }: { active?: NavSection }) {
         onToggle={menuOpen ? () => setClosing(true) : () => setMenuOpen(true)}
       />
 
-      <div className="mobile-brand compact:hidden fixed top-5 left-0 right-0 z-40 flex justify-center pointer-events-none">
-        <span className="text-title-h6 text-ink tracking-tight leading-none">
-          couldbekush
-        </span>
+      <div className="mobile-brand fixed top-5 compact:top-6 left-0 right-0 compact:left-6 compact:right-auto z-40 flex justify-center pointer-events-none">
+        <ChromeLogo className="h-5 md:h-[calc(theme(spacing.5)*1.5)] aspect-[4890/1160]" />
       </div>
 
       {menuOpen && (

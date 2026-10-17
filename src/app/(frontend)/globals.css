@@ -26,6 +26,12 @@
   --color-ink-subtle: 176 176 172;
   --color-ink-plain: 156 163 175; /* list items away from centre */
   --color-invert: 255 255 255;
+  /* The header logo's chrome tint (ChromeLogo.tsx). Three finishes on hand;
+     --color-chrome picks one — point it at another to switch. */
+  --color-chrome-silver: 255 255 255;
+  --color-chrome-gunmetal: 90 95 107;
+  --color-chrome-blue: 159 179 255; /* brand blue */
+  --color-chrome: var(--color-chrome-blue);
 
   /* Accents */
   /* The site's red-orange. Nothing is set in it at the moment — the case study

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { ChromeLogo } from '@/components/ui/ChromeLogo';
 import { NavSection, Project } from '@/types/portfolio';
 import { useTransitionBlur } from '@/hooks/useTransitionBlur';
 import { MobileMenu } from '@/components/portfolio/MobileMenu';
@@ -69,10 +70,8 @@ export function MobileChrome({
       />
 
       {/* Brand, centred on the viewport independently of the button. */}
-      <div className="mobile-brand compact:hidden fixed top-5 left-0 right-0 z-40 flex justify-center pointer-events-none">
-        <span className="text-title-h6 text-ink tracking-tight leading-none">
-          couldbekush
-        </span>
+      <div className="mobile-brand fixed top-5 compact:top-6 left-0 right-0 compact:left-6 compact:right-auto z-40 flex justify-center pointer-events-none">
+        <ChromeLogo className="h-5 md:h-[calc(theme(spacing.5)*1.5)] aspect-[4890/1160]" />
       </div>
 
       {/* The project's details and its number. Upright, these are three blocks

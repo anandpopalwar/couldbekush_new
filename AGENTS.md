@@ -53,7 +53,8 @@ src/
 │   │   └── SectionModal.tsx# Playground, Contact modals
 │   └── ui/
 │       ├── GrainOverlay.tsx # Film grain texture overlay
-│       └── Toast.tsx        # Toast notifications (nothing raises one now)
+│       ├── Toast.tsx        # Toast notifications (nothing raises one now)
+│       └── ChromeLogo.tsx   # The header logo, extruded in 3D chrome
 ├── data/
 │   └── projects.ts         # 8 portfolio projects with metadata
 ├── lib/
@@ -680,7 +681,14 @@ Below `compact` the whole layout changes: both sidebars are hidden and
 beneath it, then the swatches, then the page number (the numeral alone, no
 total), centred at the foot.
 
-There is no header at any width. The contact line, "Working globally", the
+There is no header at any width — only the logo (`mobile-brand`, despite
+the name): centred at the top below `compact`, above the left nav from
+`compact` up, where the nav is pushed down by its height. On every route.
+It is `ChromeLogo`: `public/logo.svg` extruded in WebGL chrome, tinted by
+`--color-chrome` (which points at one of `--color-chrome-silver`,
+`-gunmetal` or `-blue`; blue for now), draggable, with the flat logo in ink standing in until it
+draws or without WebGL. No blend on it — chrome has its own colour. The
+open mobile menu keeps the flat logo. The contact line, "Working globally", the
 audio toggle and the scroll hint were removed, and `TopHeader` with them. The
 address now appears only in the Contact panel and in the mobile menu's
 footer.

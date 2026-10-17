@@ -224,7 +224,7 @@ export function RightSidebar({
   const themeColors = projects[currentIndex]?.themeColors;
 
   return (
-    <aside className="rail-right hidden compact:flex compact:col-start-10 compact:col-span-3 compact:row-start-1 h-full flex-col justify-between pointer-events-auto pl-0 pr-30 overflow-hidden relative">
+    <aside className="rail-right hidden compact:flex compact:col-start-10 compact:col-span-3 compact:row-start-1 h-full flex-col justify-between pointer-events-auto pl-0 pr-6 overflow-hidden relative">
       <div
         ref={viewportRef}
         className="rail-right-viewport rs-edge-fade w-full h-full relative overflow-hidden touch-none"
@@ -261,7 +261,7 @@ export function RightSidebar({
                     "--u": emphasis,
                   } as React.CSSProperties
                 }
-                className="rail-right-slot rs-slot relative select-none px-0 pr-28"
+                className="rail-right-slot rs-slot relative select-none px-0"
               >
                 {isCenter ? (
                   // Only the active project opens — with the same href and
@@ -291,7 +291,7 @@ export function RightSidebar({
 
       {/* Selected project's theme swatches — fixed at the right edge, vertically centered
           (represents the theme of the currently selected project). */}
-      {themeColors && themeColors.length > 0 && (
+      {/* {themeColors && themeColors.length > 0 && (
         <div className="rail-right-swatches absolute right-6 top-1/2 -translate-y-1/2 hidden xl:flex space-x-1.5 pointer-events-none">
           {themeColors.map((color, i) => (
             <span
@@ -301,7 +301,7 @@ export function RightSidebar({
             />
           ))}
         </div>
-      )}
+      )} */}
 
       {/* <div className="rail-right-showreel absolute bottom-6 right-6 z-30 font-mono text-micro-md font-bold text-ink uppercase tracking-wider flex items-center space-x-1 hover:opacity-75 transition-opacity cursor-pointer">
         <span className="underline font-black">'25 showreel</span>

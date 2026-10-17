@@ -576,15 +576,13 @@ The source of truth is `:root` in `src/app/(frontend)/globals.css`.
     a flat DOM card face), `--color-stock` (the paper's underside and edge),
     `--color-shadow`
 - **The card's size** is `--card-width` / `--card-height`. From 1100px up it
-  is at most 488 × 366, grown from the old 320 × 240 **to the left only** —
-  `--card-shift` moves `deck-frame` (by CSS `left`, since gsap owns its
-  transform) so the centre card's right edge stays put; the shift is scaled
-  by `--card-centre-scale`, which must match `CENTER_SCALE`. Below 1100 the
-  stacked layout keeps the small 4:3 steps; under 640 the card is `46.5vw`,
-  which puts the centre card at about 60% of a phone's width. The shift then closes a fifth of
-  the gap to the right rail (`+ 5vw - anchor/2 × scale / 5`: the deck's
-  column spans 25–75% of the screen). The work counter and `deck-hint` follow
-  `--card-shift`, so both stay centred on the card.
+  is at most 488 × 366 and the deck is centred on the screen (`--card-shift`
+  0 — its column spans 25–75%). Below 1100 the stacked layout keeps the small
+  4:3 steps; under 640 the card is `46.5vw`, which puts the centre card at
+  about 60% of a phone's width. `--card-shift` moves `deck-frame` (by CSS
+  `left`, since gsap owns its transform) where the deck does sit off centre —
+  the `rotated:` layout. The work counter and `deck-hint` follow it, so both
+  stay centred on the card.
 - **Case study layout** is tokenized too: `--shot-width` (45vw less 10%, floored so the
   column never runs under the fixed rail), `--shot-lead` (the grid track that
   puts it on the *viewport* centre rather than its own track) and `--shot-top`

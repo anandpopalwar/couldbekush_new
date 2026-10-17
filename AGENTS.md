@@ -686,7 +686,7 @@ the name): centred at the top below `compact`, above the left nav from
 `compact` up, where the nav is pushed down by its height. On every route.
 It is `ChromeLogo`: `public/logo.svg` extruded in WebGL chrome, tinted by
 `--color-chrome` (which points at one of `--color-chrome-silver`,
-`-gunmetal` or `-blue`; blue for now), draggable, with the flat logo in ink standing in until it
+`-gunmetal` or `-blue`; gunmetal for now), draggable, with the flat logo in ink standing in until it
 draws or without WebGL. No blend on it — chrome has its own colour. The
 open mobile menu keeps the flat logo. The contact line, "Working globally", the
 audio toggle and the scroll hint were removed, and `TopHeader` with them. The

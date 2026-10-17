@@ -151,12 +151,10 @@ export function MobileMenu({
           flow, so the proportions hold at any phone height: tagline at 30%,
           nav at 57%, footer pinned to the bottom. */}
 
-      {/* The close control is MenuToggle, rendered by MobileChrome above this
-          panel — one element that morphs between the two states rather than a
-          separate button appearing here. Only the brand belongs to the panel. */}
-      <div className="absolute top-5 left-0 right-0 flex justify-center">
-        <span role="img" aria-label="couldbekush" className="block h-5 md:h-[calc(theme(spacing.5)*1.5)] aspect-[4890/1160] bg-ink [mask:url(/logo.svg)_center/contain_no-repeat]" />
-      </div>
+      {/* Neither the close control nor the logo is drawn here. Both belong to
+          the chrome (MobileChrome / ProjectChrome) and sit above this panel:
+          MenuToggle morphs in place, and the chrome logo keeps spinning
+          rather than a second copy starting up. */}
 
       <p ref={taglineRef} className="absolute left-4 top-[30%] text-label-xs">
         Independent designer

@@ -684,8 +684,11 @@ the name): centred at the top below `compact`, above the left nav from
 `compact` up, where the nav is pushed down by its height. On every route.
 It is `ChromeLogo`: `public/logo.svg` extruded in WebGL chrome, tinted by
 `--color-chrome` (which points at one of `--color-chrome-silver`,
-`-gunmetal` or `-blue`; gunmetal for now), draggable, with the flat logo in ink standing in until it
-draws or without WebGL. No blend on it — chrome has its own colour. The
+`-gunmetal` or `-blue`; gunmetal for now). A drag across spins it freely, with inertia;
+up and down only tilts it, to ~43° and back level, so it is never upside
+down. A gentle idle float — plus a slow left-to-right spin
+about its own vertical axis (`IDLE_SPIN`), paused while dragged. There is no flat fallback: until it draws, or without
+WebGL, the spot is empty. No blend on it — chrome has its own colour. The
 open mobile menu keeps the flat logo. The contact line, "Working globally", the
 audio toggle and the scroll hint were removed, and `TopHeader` with them. The
 address now appears only in the Contact panel and in the mobile menu's

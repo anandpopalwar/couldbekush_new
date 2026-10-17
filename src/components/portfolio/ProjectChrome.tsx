@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { ChromeLogo } from '@/components/ui/ChromeLogo';
 import { usePathname } from 'next/navigation';
 import { SlideLink } from '@/components/transition/SlideLink';
 import { MenuToggle } from '@/components/portfolio/MenuToggle';
@@ -88,8 +89,8 @@ export function ProjectChrome({ active = 'work' }: { active?: NavSection }) {
         onToggle={menuOpen ? () => setClosing(true) : () => setMenuOpen(true)}
       />
 
-      <div className="mobile-brand fixed top-5 compact:top-6 left-0 right-0 compact:left-6 compact:right-auto z-40 flex justify-center pointer-events-none mix-blend-difference">
-        <span role="img" aria-label="couldbekush" className="block h-5 md:h-[calc(theme(spacing.5)*1.5)] aspect-[4890/1160] bg-invert [mask:url(/logo.svg)_center/contain_no-repeat]" />
+      <div className="mobile-brand fixed top-5 compact:top-6 left-0 right-0 compact:left-6 compact:right-auto z-40 flex justify-center pointer-events-none">
+        <ChromeLogo className="h-5 md:h-[calc(theme(spacing.5)*1.5)] aspect-[4890/1160]" />
       </div>
 
       {menuOpen && (

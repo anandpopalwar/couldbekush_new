@@ -11,6 +11,7 @@ import { RightSidebar } from '@/components/portfolio/RightSidebar';
 import { useRouter } from 'next/navigation';
 import { useRouteSlide } from '@/app/(frontend)/template';
 import { SectionModal } from '@/components/portfolio/SectionModal';
+import { ContactCards } from '@/components/portfolio/ContactCards';
 import { CardDeck2 } from './CardDeck2';
 import { MobileChrome } from '@/components/portfolio/MobileChrome';
 
@@ -57,7 +58,7 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
   );
 
   // About is a page of its own, reached through the same slide as a case
-  // study. Playground and Contact are still panels over the deck.
+  // study. Playground is a panel over the deck; Contact tosses cards onto it.
   const selectSection = useCallback(
     (section: NavSection) => {
       if (section === 'about') slideTo('/about', 'About');
@@ -185,7 +186,11 @@ export function PortfolioClient({ projects }: { projects: Project[] }) {
       />
 
       
-      {/* Interactive Section Modals (Playground, Contact) */}
+      {activeSection === 'contact' && (
+        <ContactCards onClose={() => setActiveSection('work')} />
+      )}
+
+      {/* Playground panel */}
       <SectionModal
         section={activeSection}
         onClose={() => setActiveSection('work')}

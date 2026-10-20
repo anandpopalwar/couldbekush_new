@@ -31,7 +31,7 @@
   --color-chrome-silver: 255 255 255;
   --color-chrome-gunmetal: 90 95 107;
   --color-chrome-blue: 159 179 255; /* brand blue */
-  --color-chrome: var(--color-chrome-blue);
+  --color-chrome: var(--color-chrome-gunmetal);
 
   /* Accents */
   /* The site's red-orange. Nothing is set in it at the moment — the case study
@@ -141,12 +141,8 @@
     --counter-size: 9.5rem;
   }
 }
-/* The side-by-side layout (compact: and up): up to 488 × 366, grown from the
-   320 × 240 card to the left only — its right edge stays where that card's
-   was. The deck is centred in its column, so it's shifted left by half the
-   width gained; the centre card is drawn at CENTER_SCALE (CardDeck2.tsx)
-   about its own centre, so that's scaled too, or the right edge would still
-   creep out. */
+/* The side-by-side layout (compact: and up): a card up to 488 × 366, centred
+   on the screen. */
 @media (min-width: 1100px) {
   :root {
     /* 488 × 366 from 1440px up (the wide: target); narrower screens take
@@ -154,16 +150,8 @@
        rail's project details. */
     --card-width: min(488px, 33.9vw);
     --card-height: min(366px, 25.42vw);
-    --card-anchor-width: 320px;
-    --card-centre-scale: 1.3; /* = CENTER_SCALE */
-    /* …and then nudged back right to close a fifth of the gap to the right
-       rail. The deck's column spans 25–75% of the screen and the anchor
-       card's right edge sat anchor/2 × scale past the middle, so that gap is
-       25vw less that; a fifth of it is 5vw less a fifth of that. */
-    --card-shift: calc(
-      (var(--card-anchor-width) - var(--card-width)) / 2 * var(--card-centre-scale) +
-        5vw - var(--card-anchor-width) / 2 * var(--card-centre-scale) / 5
-    );
+    /* The deck's column spans 25–75% of the screen, so no shift centres it. */
+    --card-shift: 0px;
   }
 }
 

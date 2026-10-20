@@ -89,8 +89,8 @@ export function ProjectChrome({ active = 'work' }: { active?: NavSection }) {
         onToggle={menuOpen ? () => setClosing(true) : () => setMenuOpen(true)}
       />
 
-      <div className="mobile-brand fixed top-5 compact:top-6 left-0 right-0 compact:left-6 compact:right-auto z-40 flex justify-center pointer-events-none">
-        <ChromeLogo className="h-5 md:h-[calc(theme(spacing.5)*1.5)] aspect-[4890/1160]" />
+      <div className="mobile-brand fixed top-5 compact:top-6 left-0 right-0 compact:left-6 compact:right-auto z-[55] h-7 compact:h-auto flex items-center justify-center pointer-events-none">
+        <ChromeLogo className="h-[calc(theme(spacing.5)*1.3)] md:h-[calc(theme(spacing.5)*1.5)] aspect-[4890/1160]" />
       </div>
 
       {menuOpen && (

@@ -175,7 +175,8 @@ export function MobileMenu({
               key={item.id}
               onClick={() => {
                 onSelectSection(item.id);
-                onRequestClose();
+                // Contact lays its card over the menu, which stays open under it.
+                if (item.id !== 'contact') onRequestClose();
               }}
               // Only `filter` transitions: the bounce drives transform and
               // opacity from GSAP, and transition-all would fight it.

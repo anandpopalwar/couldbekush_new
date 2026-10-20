@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  X,
-  Mail,
-  ArrowUpRight,
-  Github,
-  Twitter,
-  Linkedin,
-  Code,
-} from "lucide-react";
+import { X, Code } from "lucide-react";
 import { NavSection } from "@/types/portfolio";
 
 interface SectionModalProps {
@@ -17,7 +9,8 @@ interface SectionModalProps {
 }
 
 export function SectionModal({ section, onClose }: SectionModalProps) {
-  if (!section || section === "work") return null;
+  // Contact is ContactCards; About is a page.
+  if (section !== "playground") return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-black/60 backdrop-blur-md animate-in fade-in transition-all duration-300">
@@ -79,55 +72,7 @@ export function SectionModal({ section, onClose }: SectionModalProps) {
             </div>
           )}
 
-          {section === "contact" && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl md:text-3xl font-extrabold uppercase tracking-tight text-ink mb-2">
-                  Initiate a Project
-                </h2>
-                <p className="text-paragraph-sm text-ink/80">
-                  Currently accepting select design direction and website build
-                  commissions for Q3/Q4 2026.
-                </p>
-              </div>
 
-              <div className="p-4 bg-white/70 rounded-lg border border-ink/10 space-y-3 font-mono">
-                <span className="text-micro-md text-inkMuted uppercase tracking-wider block">
-                  Direct Contact
-                </span>
-                <a
-                  href="mailto:couldbekush@gmail.com"
-                  className="text-paragraph-lg md:text-title-h6 font-bold text-ink hover:underline flex items-center gap-2"
-                >
-                  <Mail className="w-5 h-5 text-inkMuted" />
-                  <span>couldbekush@gmail.com</span>
-                </a>
-              </div>
-
-              <div className="flex space-x-4 font-mono text-paragraph-xs pt-2">
-                <a
-                  href="https://twitter.com"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center space-x-1.5 text-ink font-semibold hover:opacity-75 transition-opacity"
-                >
-                  <Twitter className="w-4 h-4" />
-                  <span>Twitter</span>
-                  <ArrowUpRight className="w-3 h-3 text-inkMuted" />
-                </a>
-                <a
-                  href="https://linkedin.com"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center space-x-1.5 text-ink font-semibold hover:opacity-75 transition-opacity"
-                >
-                  <Linkedin className="w-4 h-4" />
-                  <span>LinkedIn</span>
-                  <ArrowUpRight className="w-3 h-3 text-inkMuted" />
-                </a>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

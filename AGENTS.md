@@ -50,7 +50,8 @@ src/
 │   │   ├── MobileMenu.tsx  # Full-screen menu for that layout
 │   │   ├── MenuToggle.tsx  # The two rules that morph into a cross
 │   │   ├── ProjectModal.tsx# Full project detail modal
-│   │   └── SectionModal.tsx# Playground, Contact modals
+│   │   ├── ContactCards.tsx# Contact: draggable cards over the deck
+│   │   └── SectionModal.tsx# Playground modal
 │   └── ui/
 │       ├── GrainOverlay.tsx # Film grain texture overlay
 │       ├── Toast.tsx        # Toast notifications (nothing raises one now)
@@ -218,6 +219,22 @@ reference but is commented out.
 - Tunable constants live at the top of the file: `CENTER_SCALE`, `SLOT_NUDGE`,
   `OFFSCREEN_STEP`, `DURATION`/`EASE`, and the `INTRO_*` set.
 
+### ContactCards.tsx
+CONTACT on the deck tosses two cards up from below the screen: "Come say hi"
+(`bg-surface`: email, LinkedIn, Twitter) and Credits (`bg-canvasDark`). Their text
+and links are the `SAY_HI` / `CREDITS` lists at the top of the file.
+
+- **Drag, never throw.** A card follows the pointer, leans with its sideways
+  speed (`DRAG_TILT`) and stays exactly where it is let go, easing back to
+  its resting tilt. The one touched comes to the front.
+- **A press on a link or Close is not a drag.** `setPointerCapture` would
+  hand the click to the card instead — that is how Close once did nothing.
+- Close, Escape or a click on the bare page drops both cards off the bottom.
+- **Phones (under `sm`) get "Come say hi" only**, one column. Picking
+  Contact from the mobile menu leaves the menu open under the card.
+- Placed by gsap's `x` / `y` from the viewport's centre (`REST`, scaled
+  down under 1100px); reduced motion sets them down without the toss.
+
 ### CardDeck.tsx (superseded)
 - 3D card stack with perspective transforms (1400px perspective)
 - GSAP-powered animations (rotation, scale, opacity)
@@ -280,8 +297,8 @@ Invisible Arc (bottom half): Top cards → Bottom cards (instant, opacity 0)
 
 ### LeftSidebar.tsx
 - Navigation menu (WORK, ABOUT, PLAYGROUND, CONTACT). ABOUT leaves for
-  `/about` through the slide; PLAYGROUND and CONTACT still open `SectionModal`
-  over the deck.
+  `/about` through the slide; PLAYGROUND opens `SectionModal` over the deck
+  and CONTACT tosses `ContactCards` onto it.
 - Project metadata (`rail-left-meta`) — Role, then Launch, as a ruled list in
   the bottom-left corner: a rule above each row, the label on the left, the
   value right-aligned. Anchored by its foot, so a role that wraps grows the
@@ -406,8 +423,8 @@ and the front card's details are laid over them. The wheel, a drag, the arrow
 keys and the card nav all move the track; only the front card opens.
 
 ABOUT in every menu goes here through the slide. It was a `SectionModal` panel
-before; Playground and Contact still are, so from a case study or from About
-those two return home.
+before; Playground still is, and Contact is cards over the deck, so from a
+case study or from About those two return home.
 
 - **They are called magazines.** That is the word for the About page's cards
   in the CMS, in the UI text and in conversation. The code's older names
@@ -648,7 +665,7 @@ strings against source files.
 | Below 1100 | `menu-toggle`, `mobile-brand`, `mobile-info`, `mobile-counter`, `mobile-detail`, `mobile-swatches`, `mobile-menu`, `mobile-menu-nav`, `mobile-menu-footer` |
 | Case study | `case-study`, `case-study-body`, `case-study-rail`, `case-study-shots`, `case-study-shot`, `case-study-embed`, `case-study-minimap`, `case-study-title`, `case-study-next` |
 | About | `about-page`, `about-stage`, `about-ui`, `about-top`, `about-notes` |
-| Overlays | `grain-overlay`, `toast` |
+| Overlays | `grain-overlay`, `toast`, `contact-cards`, `contact-card` |
 
 **They carry no styles and must not be given any.** Styling lives in Tailwind
 tokens; these exist only to identify. The styled non-Tailwind classes are a
@@ -691,7 +708,7 @@ about its own vertical axis (`IDLE_SPIN`), paused while dragged. There is no fla
 WebGL, the spot is empty. No blend on it — chrome has its own colour. The
 open mobile menu keeps the flat logo. The contact line, "Working globally", the
 audio toggle and the scroll hint were removed, and `TopHeader` with them. The
-address now appears only in the Contact panel and in the mobile menu's
+address now appears only on the Contact card and in the mobile menu's
 footer.
 
 `rotated:` is a variant, not a screen — a raw media query among `screens`
